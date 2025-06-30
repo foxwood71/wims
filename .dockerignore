@@ -1,0 +1,11 @@
+.git
+.gitignore
+.venv/
+__pycache__/
+*.pyc
+*.sqlite3
+.env # .env 파일을 Dockerfile에서 COPY하지 않고 외부에서 관리할 경우 활성화
+.pytest_cache/
+*.log
+venv/ # 다른 이름의 가상 환경 폴더가 있다면 추가
+node_modules/ # 프론트엔드 빌드 결과물 등이 같은 레벨에 있다면 제외
