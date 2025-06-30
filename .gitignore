@@ -23,8 +23,6 @@ pip-delete-this-directory.txt
 # 프로젝트 관련 파일
 # ------------------------------------
 .env.txt
-@memo.md
-@todo.md
 .python-version
 openapi.json
 doc/
