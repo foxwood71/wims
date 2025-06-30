@@ -62,7 +62,7 @@ class FacilityUpdate(FacilityBase):
     name: Optional[str] = Field(None, max_length=100, description="시설 현장 호칭 명칭")
 
 
-class FacilityResponse(FacilityBase):
+class FacilityRead(FacilityBase):
     """
     시설 정보를 클라이언트에 응답하기 위한 Pydantic 모델입니다.
     데이터베이스에서 자동으로 생성되는 ID 및 타임스탬프 필드를 포함합니다.
@@ -103,7 +103,7 @@ class LocationTypeUpdate(LocationTypeBase):
     name: Optional[str] = Field(None, max_length=100, description="장소 유형 명칭")
 
 
-class LocationTypeResponse(LocationTypeBase):
+class LocationTypeRead(LocationTypeBase):
     """
     장소 유형 정보를 클라이언트에 응답하기 위한 Pydantic 모델입니다.
     """
@@ -147,7 +147,7 @@ class LocationUpdate(LocationBase):
     name: Optional[str] = Field(None, max_length=100, description="장소 현장 호칭 명칭")
 
 
-class LocationResponse(LocationBase):
+class LocationRead(LocationBase):
     """
     장소 정보를 클라이언트에 응답하기 위한 Pydantic 모델입니다.
     """

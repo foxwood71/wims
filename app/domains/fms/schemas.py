@@ -9,10 +9,14 @@ Pydantic 모델을 포함합니다.
 SQLModel의 기능을 활용하여 데이터베이스 ORM 모델과 Pydantic 모델 간의 일관성을 유지합니다.
 """
 
-from typing import Optional, List, Dict, Any
+from typing import Optional, Dict, Any
 from datetime import datetime, date
-from pydantic import BaseModel, Field
-from sqlmodel import SQLModel  # SQLModel 클래스 임포트
+
+from sqlmodel import SQLModel
+
+from pydantic import Field
+
+from .models import EquipmentStatus
 
 
 # =============================================================================
@@ -154,7 +158,8 @@ class EquipmentBase(SQLModel):
     purchase_date: Optional[date] = Field(None, description="구입일")
     purchase_price: Optional[float] = Field(None, description="구입 가격 (NUMERIC(18, 2))")
     expected_lifespan_years: Optional[int] = Field(None, description="예상 수명 (년)")
-    status: str = Field("OPERATIONAL", max_length=50, description="설비 상태 (OPERATIONAL, UNDER_MAINTENANCE, OUT_OF_SERVICE, SCRAPPED)")
+    # status: str = Field("OPERATIONAL", max_length=50, description="설비 상태 (OPERATIONAL, UNDER_MAINTENANCE, OUT_OF_SERVICE, SCRAPPED)")
+    status: EquipmentStatus = EquipmentStatus.ACTIVE
     asset_tag: Optional[str] = Field(None, max_length=100, description="자산 태그 (고유)")
     notes: Optional[str] = Field(None, description="비고")
 

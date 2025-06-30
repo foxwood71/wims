@@ -6,10 +6,13 @@
 
 from typing import List, Union, Dict, Any, Optional
 import logging
+
 # from sqlalchemy.orm import joinedload # joinedload 임포트 추가
 from sqlalchemy.exc import IntegrityError
+
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
+
 from fastapi import HTTPException, status
 
 # 공통 CRUDBase 및 LOC 도메인의 모델, 스키마 임포트
@@ -24,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 
 # =============================================================================
-# 1. 시설 (Facility) CRUD (구: Facility)
+# 1. 시설 (Facility) CRUD
 # =============================================================================
 class CRUDFacility(
     CRUDBase[
@@ -56,48 +59,72 @@ class CRUDFacility(
             raise HTTPException(status_code=400, detail="Facility with this name already exists.")
         return await super().create(db, obj_in=obj_in)
 
-    async def delete(self, db: AsyncSession, *, id: int) -> Optional[loc_models.Facility]:
-        """ID로 시설을 삭제합니다. 관련된 데이터가 있으면 삭제를 제한합니다."""
-        db_obj = await self.get(db, id=id)
-        if db_obj is None:
-            return None
+    # async def remove(self, db: AsyncSession, *, id: int) -> Optional[loc_models.Facility]:
+    #     """ID로 시설을 삭제합니다. 관련된 데이터가 있으면 삭제를 제한합니다."""
+    #     db_obj = await self.get(db, id=id)
+    #     if db_obj is None:
+    #         return None
 
-        existing_locations = await db.execute(
-            select(loc_models.Location).where(loc_models.Location.facility_id == id)  # facility_id -> facility_id
-        )
-        if existing_locations.scalars().first():
+    #     existing_locations = await db.execute(
+    #         select(loc_models.Location).where(loc_models.Location.facility_id == id)  # facility_id -> facility_id
+    #     )
+    #     if existing_locations.scalars().first():
+    #         raise HTTPException(
+    #             status_code=status.HTTP_400_BAD_REQUEST,
+    #             detail="Cannot delete facility because there are associated locations."
+    #         )
+
+    #     existing_equipments = await db.execute(
+    #         select(FmsEquipment).where(FmsEquipment.facility_id == id)  # facility_id -> facility_id
+    #     )
+    #     if existing_equipments.scalars().first():
+    #         raise HTTPException(
+    #             status_code=status.HTTP_400_BAD_REQUEST,
+    #             detail="Cannot delete facility because there are associated equipments."
+    #         )
+
+    #     try:
+    #         await db.delete(db_obj)
+    #         await db.commit()
+    #         return db_obj
+    #     except IntegrityError as e:
+    #         await db.rollback()
+    #         logger.error(f"IntegrityError caught during facility deletion (ID: {id}): {e}", exc_info=True)
+    #         raise HTTPException(
+    #             status_code=status.HTTP_400_BAD_REQUEST,
+    #             detail="Cannot delete facility due to existing related data."
+    #         )
+    #     except Exception as e:
+    #         await db.rollback()
+    #         logger.error(f"Unexpected error during facility deletion (ID: {id}): {e}", exc_info=True)
+    #         raise HTTPException(
+    #             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+    #             detail=f"An unexpected error occurred: {e}"
+    #         )
+    async def remove(self, db: AsyncSession, *, id: int) -> Optional[loc_models.Facility]:
+        """
+        시설을 삭제합니다.
+        단, 하위에 소속된 장소(Location)나 설비(Equipment)가 있으면 삭제를 거부합니다.
+        """
+        # 1. 삭제할 시설에 소속된 장소(Location)가 있는지 확인
+        location_check_stmt = select(loc_models.Location).where(loc_models.Location.facility_id == id).limit(1)
+        if (await db.execute(location_check_stmt)).first():
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Cannot delete facility because there are associated locations."
+                detail="Cannot delete this facility as it has associated locations."
             )
 
-        existing_equipments = await db.execute(
-            select(FmsEquipment).where(FmsEquipment.facility_id == id)  # facility_id -> facility_id
-        )
-        if existing_equipments.scalars().first():
+        # 2. 삭제할 시설에 소속된 설비(Equipment)가 있는지 확인
+        equipment_check_stmt = select(FmsEquipment).where(FmsEquipment.facility_id == id).limit(1)
+        if (await db.execute(equipment_check_stmt)).first():
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Cannot delete facility because there are associated equipments."
+                detail="Cannot delete this facility as it has associated equipment."
             )
 
-        try:
-            await db.delete(db_obj)
-            await db.commit()
-            return db_obj
-        except IntegrityError as e:
-            await db.rollback()
-            logger.error(f"IntegrityError caught during facility deletion (ID: {id}): {e}", exc_info=True)
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Cannot delete facility due to existing related data."
-            )
-        except Exception as e:
-            await db.rollback()
-            logger.error(f"Unexpected error during facility deletion (ID: {id}): {e}", exc_info=True)
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"An unexpected error occurred: {e}"
-            )
+        # 3. 하위 데이터가 없으면, 부모 클래스의 기본 삭제 로직을 호출
+        # (remove 대신 delete를 사용하고 계시므로 delete로 유지합니다)
+        return await super().delete(db, id=id)
 
     async def update(
         self,
@@ -135,26 +162,42 @@ class CRUDLocationType(
             raise HTTPException(status_code=400, detail="Location type with this name already exists.")
         return await super().create(db, obj_in=obj_in)
 
-    async def delete(self, db: AsyncSession, *, id: int) -> Optional[loc_models.LocationType]:
-        """ID로 유형을 삭제합니다. 관련된 Location 데이터가 있으면 삭제를 제한합니다."""
-        # 명시적으로 관련된 Location이 있는지 확인합니다.
-        check_query = select(loc_models.Location).where(loc_models.Location.location_type_id == id)
-        result = await db.execute(select(check_query.exists()))
-        is_in_use = result.scalar()
+    # async def remove(self, db: AsyncSession, *, id: int) -> Optional[loc_models.LocationType]:
+    #     """ID로 유형을 삭제합니다. 관련된 Location 데이터가 있으면 삭제를 제한합니다."""
+    #     # 명시적으로 관련된 Location이 있는지 확인합니다.
+    #     check_query = select(loc_models.Location).where(loc_models.Location.location_type_id == id)
+    #     result = await db.execute(select(check_query.exists()))
+    #     is_in_use = result.scalar()
 
-        if is_in_use:
+    #     if is_in_use:
+    #         raise HTTPException(
+    #             status_code=status.HTTP_400_BAD_REQUEST,
+    #             detail="Cannot delete location type due to existing related data."
+    #         )
+
+    #     # 관련된 데이터가 없으면 삭제를 진행합니다.
+    #     db_obj = await self.get(db, id=id)
+    #     if db_obj:
+    #         await db.delete(db_obj)
+    #         await db.commit()
+    #         return db_obj
+    #     return None
+
+    async def remove(self, db: AsyncSession, *, id: int) -> Optional[loc_models.LocationType]:
+        """
+        장소 유형을 삭제합니다.
+        단, 해당 유형을 사용하는 장소(Location)가 있으면 삭제를 거부합니다.
+        """
+        # 1. 이 유형을 사용하는 장소가 있는지 확인합니다.
+        location_check_stmt = select(loc_models.Location).where(loc_models.Location.location_type_id == id).limit(1)
+        if (await db.execute(location_check_stmt)).first():
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Cannot delete location type due to existing related data."
+                detail="Cannot delete this location type as it is currently in use by locations."
             )
 
-        # 관련된 데이터가 없으면 삭제를 진행합니다.
-        db_obj = await self.get(db, id=id)
-        if db_obj:
-            await db.delete(db_obj)
-            await db.commit()
-            return db_obj
-        return None
+        # 2. 연결된 장소가 없으면, 부모 클래스의 기본 삭제 로직을 호출
+        return await super().delete(db, id=id)
 
     async def update(  # update 추가
         self,
@@ -213,7 +256,7 @@ class CRUDLocation(
             raise HTTPException(status_code=400, detail="Parent location not found for the given ID")
         return await super().create(db, obj_in=obj_in)
 
-    async def delete(self, db: AsyncSession, *, id: int) -> Optional[loc_models.Location]:
+    async def remove(self, db: AsyncSession, *, id: int) -> Optional[loc_models.Location]:
         """ID로 장소를 삭제합니다. 연결된 설비(Equipment)가 있으면 삭제를 제한합니다."""
         equipment_check_query = select(FmsEquipment).where(FmsEquipment.current_location_id == id)
         result = await db.execute(select(equipment_check_query.exists()))

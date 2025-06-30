@@ -2,6 +2,8 @@
 
 """
 'loc' 도메인 (PostgreSQL 'loc' 스키마)의 데이터베이스 ORM 모델을 정의하는 모듈입니다.
+ - loc 도메인은 처리장(Facility) -> 장소(Location) 계층 구조
+ - 구역(Area) 은 Location하위 구조
 
 이 모듈은 'loc' 스키마에 속하는 모든 테이블 (facility, location_types, locations)에 대한
 SQLModel 클래스를 포함합니다.

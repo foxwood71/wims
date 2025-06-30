@@ -45,7 +45,7 @@ class VersionUpdate(VersionBase):
     pass  # VersionBase의 모든 필드가 Optional이므로 추가 정의 필요 없음
 
 
-class VersionResponse(VersionBase):
+class VersionRead(VersionBase):
     """
     애플리케이션 버전 정보를 클라이언트에 응답하기 위한 Pydantic 모델입니다.
     데이터베이스에서 자동으로 생성되는 ID 및 타임스탬프 필드를 포함합니다.
@@ -85,7 +85,7 @@ class ImageTypeUpdate(ImageTypeBase):
     name: Optional[str] = Field(None, max_length=100, description="이미지 유형 명칭")
 
 
-class ImageTypeResponse(ImageTypeBase):
+class ImageTypeRead(ImageTypeBase):
     """
     이미지 유형 정보를 클라이언트에 응답하기 위한 Pydantic 모델입니다.
     """
@@ -149,7 +149,7 @@ class ImageUpdate(ImageBase):
     department_id: Optional[int] = None
 
 
-class ImageResponse(ImageBase):
+class ImageRead(ImageBase):
     """
     업로드된 이미지 정보를 클라이언트에 응답하기 위한 Pydantic 모델입니다.
     """
@@ -197,7 +197,7 @@ class EntityImageUpdate(EntityImageBase):
     is_main_image: Optional[bool] = Field(None, description="해당 엔티티의 대표 이미지 여부")
 
 
-class EntityImageResponse(EntityImageBase):
+class EntityImageRead(EntityImageBase):
     """
     엔티티-이미지 연결 정보를 클라이언트에 응답하기 위한 Pydantic 모델입니다.
     """

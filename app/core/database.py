@@ -9,12 +9,14 @@
 """
 
 from typing import AsyncGenerator
-from sqlmodel import SQLModel  # , Session  # Session은 SQLModel에서 제공하는 동기식 Session
-from sqlmodel.ext.asyncio.session import AsyncSession  # AsyncSession은 비동기용
+from contextlib import asynccontextmanager
+
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncEngine  # 비동기 엔진 생성 함수와 타입 임포트
-from sqlalchemy.orm import configure_mappers  # configure_mappers 임포트 추가
-# from sqlalchemy.schema import MetaData
+from sqlalchemy.orm import configure_mappers, sessionmaker 
 from sqlalchemy import text  # 스키마 생성 시 text 함수 필요
+
+from sqlmodel import SQLModel
+from sqlmodel.ext.asyncio.session import AsyncSession  # AsyncSession은 비동기용
 
 # 애플리케이션 설정을 임포트합니다.
 from app.core.config import settings
@@ -44,6 +46,15 @@ engine: AsyncEngine = create_async_engine(
     pool_recycle=3600,  # 1시간마다 연결 재활용 (PostgreSQL 기본 유휴 타임아웃 8시간)
     pool_size=10,  # 최소 10개의 연결 유지
     max_overflow=20  # 최대 20개의 추가 연결 허용 (총 30개)
+)
+
+# 비동기 세션을 생성하는 '세션 공장'을 정의합니다.
+AsyncSessionLocal = sessionmaker(
+    autocommit=False,
+    autoflush=False,
+    bind=engine,
+    class_=AsyncSession,
+    expire_on_commit=False,
 )
 
 # SQLModel의 기본 MetaData 객체입니다.
@@ -103,5 +114,22 @@ async def get_session() -> AsyncGenerator[AsyncSession, None]:
     FastAPI 의존성 주입을 위한 비동기 데이터베이스 세션 제너레이터입니다.
     요청마다 새로운 세션을 생성하고, 요청 처리 후 세션을 자동으로 닫습니다.
     """
-    async with AsyncSession(engine) as session:
+    async with AsyncSessionLocal() as session:
         yield session
+
+
+@asynccontextmanager
+async def get_async_session_context() -> AsyncGenerator[AsyncSession, None]:
+    """
+    ARQ Task 등 비동기 컨텍스트에서 사용할 수 있는
+    독립적인 비동기 DB 세션을 제공하는 컨텍스트 관리자입니다.
+    """
+    async with AsyncSessionLocal() as session:
+        try:
+            yield session
+            await session.commit()
+        except Exception:
+            await session.rollback()
+            raise
+        finally:
+            await session.close()

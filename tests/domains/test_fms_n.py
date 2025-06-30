@@ -11,6 +11,7 @@
 """
 
 import pytest
+# from datetime import date
 from httpx import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -18,15 +19,10 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.domains.loc import models as loc_models
 from app.domains.usr import models as usr_models
 from app.domains.ven import models as ven_models
-
-#  FMS 도메인의 모델 임포트
 from app.domains.fms import models as fms_models
-
-from datetime import date
 
 
 #  --- FMS 보조 데이터 생성 픽스처 ---
-
 @pytest.fixture(name="fms_test_plant")
 async def fms_test_plant_fixture(db_session: AsyncSession) -> loc_models.Facility:
     """테스트용 처리장을 생성하는 픽스처"""
@@ -82,7 +78,6 @@ async def fms_test_spec_def_fixture(db_session: AsyncSession) -> fms_models.Equi
     return spec_def
 
 
-# [신규] 기존 데이터를 표현하기 위한 별도의 스펙 정의 픽스처 추가
 @pytest.fixture(name="fms_existing_spec_def")
 async def fms_existing_spec_def_fixture(db_session: AsyncSession) -> fms_models.EquipmentSpecDefinition:
     """초기 데이터 세팅을 위한 기존 스펙 정의 픽스처"""
@@ -355,11 +350,13 @@ class TestEquipment:
             "current_location_id": fms_test_location.id,
             "name": "유입 펌프 #1",
             "serial_number": "SN-PUMP-001",
-            "asset_tag": "ASSET-001"
+            "asset_tag": "ASSET-001",
+            "status": fms_models.EquipmentStatus.OPERATIONAL.value,
         }
         response = await admin_client.post("/api/v1/fms/equipments", json=equipment_data)
         assert response.status_code == 201
         assert response.json()["name"] == equipment_data["name"]
+        assert response.json()["status"] == fms_models.EquipmentStatus.OPERATIONAL
 
     async def test_read_equipments_with_filters(self, client: AsyncClient, fms_test_equipment: fms_models.Equipment):
         """(성공) 다양한 필터로 설비 목록 조회"""
@@ -382,7 +379,7 @@ class TestEquipment:
 
     async def test_update_equipment_by_admin(self, admin_client: AsyncClient, fms_test_equipment: fms_models.Equipment):
         """(성공) 관리자가 설비 정보 업데이트"""
-        update_data = {"name": "업데이트된 설비명", "status": "UNDER_MAINTENANCE"}
+        update_data = {"name": "업데이트된 설비명", "status": "MAINTENANCE"}
         response = await admin_client.put(f"/api/v1/fms/equipments/{fms_test_equipment.id}", json=update_data)
         assert response.status_code == 200
         data = response.json()
@@ -476,7 +473,7 @@ class TestEquipmentSpec:
 
 
 #  =============================================================================
-#  6. 설비 이력 (equipment_history) 엔드포인트 테스트
+#  6. 설비 이력 (equipment_histories) 엔드포인트 테스트
 #  =============================================================================
 @pytest.mark.asyncio
 class TestEquipmentHistory:
@@ -487,7 +484,7 @@ class TestEquipmentHistory:
     ):
         """(성공) 일반 유저가 새 설비 이력 생성 (수행자는 자동으로 현재 유저)"""
         history_data = {"equipment_id": fms_test_equipment.id, "change_type": "MAINTENANCE", "description": "월간 정기 점검"}
-        response = await authorized_client.post("/api/v1/fms/equipment_history", json=history_data)
+        response = await authorized_client.post("/api/v1/fms/equipment_histories", json=history_data)
         assert response.status_code == 201
         created_history = response.json()
         assert created_history["equipment_id"] == fms_test_equipment.id
@@ -496,7 +493,7 @@ class TestEquipmentHistory:
     async def test_create_equipment_history_with_invalid_fk_fails(self, admin_client: AsyncClient):
         """(실패) 존재하지 않는 설비 ID로 이력 생성 시 400 Bad Request"""
         history_data = {"equipment_id": 99999, "change_type": "FAILURE", "description": "잘못된 이력"}
-        response = await admin_client.post("/api/v1/fms/equipment_history", json=history_data)
+        response = await admin_client.post("/api/v1/fms/equipment_histories", json=history_data)
         assert response.status_code == 400
         assert "not found" in response.json()["detail"]
 
@@ -504,8 +501,8 @@ class TestEquipmentHistory:
         self, client: AsyncClient, admin_client: AsyncClient, fms_test_equipment: fms_models.Equipment
     ):
         """(성공) 특정 설비의 모든 이력 기록 조회"""
-        await admin_client.post("/api/v1/fms/equipment_history", json={"equipment_id": fms_test_equipment.id, "change_type": "INSTALL"})
-        await admin_client.post("/api/v1/fms/equipment_history", json={"equipment_id": fms_test_equipment.id, "change_type": "REPAIR"})
+        await admin_client.post("/api/v1/fms/equipment_histories", json={"equipment_id": fms_test_equipment.id, "change_type": "INSTALL"})
+        await admin_client.post("/api/v1/fms/equipment_histories", json={"equipment_id": fms_test_equipment.id, "change_type": "REPAIR"})
 
         response = await client.get(f"/api/v1/fms/equipments/{fms_test_equipment.id}/history")
         assert response.status_code == 200
@@ -515,25 +512,25 @@ class TestEquipmentHistory:
 
     async def test_read_single_equipment_history(self, client: AsyncClient, admin_client: AsyncClient, fms_test_equipment: fms_models.Equipment):
         """(성공) ID로 특정 설비 이력 기록 조회"""
-        create_res = await admin_client.post("/api/v1/fms/equipment_history", json={"equipment_id": fms_test_equipment.id, "change_type": "TEST"})
+        create_res = await admin_client.post("/api/v1/fms/equipment_histories", json={"equipment_id": fms_test_equipment.id, "change_type": "TEST"})
         history_id = create_res.json()["id"]
 
-        response = await client.get(f"/api/v1/fms/equipment_history/{history_id}")
+        response = await client.get(f"/api/v1/fms/equipment_histories/{history_id}")
         assert response.status_code == 200
         assert response.json()["id"] == history_id
 
     async def test_update_equipment_history(self, admin_client: AsyncClient, fms_test_equipment: fms_models.Equipment):
         """(성공) 관리자가 설비 이력 업데이트"""
-        create_res = await admin_client.post("/api/v1/fms/equipment_history", json={"equipment_id": fms_test_equipment.id, "change_type": "INITIAL"})
+        create_res = await admin_client.post("/api/v1/fms/equipment_histories", json={"equipment_id": fms_test_equipment.id, "change_type": "INITIAL"})
         history_id = create_res.json()["id"]
         update_data = {"description": "상세 설명 업데이트"}
-        response = await admin_client.put(f"/api/v1/fms/equipment_history/{history_id}", json=update_data)
+        response = await admin_client.put(f"/api/v1/fms/equipment_histories/{history_id}", json=update_data)
         assert response.status_code == 200
         assert response.json()["description"] == update_data["description"]
 
     async def test_delete_equipment_history(self, admin_client: AsyncClient, fms_test_equipment: fms_models.Equipment):
         """(성공) 관리자가 설비 이력 삭제"""
-        create_res = await admin_client.post("/api/v1/fms/equipment_history", json={"equipment_id": fms_test_equipment.id, "change_type": "TO_DELETE"})
+        create_res = await admin_client.post("/api/v1/fms/equipment_histories", json={"equipment_id": fms_test_equipment.id, "change_type": "TO_DELETE"})
         history_id = create_res.json()["id"]
-        response = await admin_client.delete(f"/api/v1/fms/equipment_history/{history_id}")
+        response = await admin_client.delete(f"/api/v1/fms/equipment_histories/{history_id}")
         assert response.status_code == 204

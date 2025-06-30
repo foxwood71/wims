@@ -32,7 +32,7 @@ router = APIRouter(
 # =============================================================================
 # 1. loc.facilities 엔드포인트 (시설 관리)
 # =============================================================================
-@router.post("/facilities/", response_model=loc_schemas.FacilityResponse, status_code=status.HTTP_201_CREATED, summary="새 시설 생성")
+@router.post("/facilities/", response_model=loc_schemas.FacilityRead, status_code=status.HTTP_201_CREATED, summary="새 시설 생성")
 async def create_facility(
     facility_create: loc_schemas.FacilityCreate,
     db: Session = Depends(get_db_session_dependency),
@@ -55,7 +55,7 @@ async def create_facility(
     return await loc_crud.facility.create(db=db, obj_in=facility_create)
 
 
-@router.get("/facilities/", response_model=List[loc_schemas.FacilityResponse], summary="모든 시설 목록 조회")
+@router.get("/facilities/", response_model=List[loc_schemas.FacilityRead], summary="모든 시설 목록 조회")
 async def read_facilities(
     skip: int = 0,
     limit: int = 100,
@@ -70,7 +70,7 @@ async def read_facilities(
     return facilities
 
 
-@router.get("/facilities/{facility_id}", response_model=loc_schemas.FacilityResponse, summary="특정 시설 정보 조회")
+@router.get("/facilities/{facility_id}", response_model=loc_schemas.FacilityRead, summary="특정 시설 정보 조회")
 async def read_facility(
     facility_id: int,
     db: Session = Depends(get_db_session_dependency)
@@ -85,7 +85,7 @@ async def read_facility(
     return db_facility
 
 
-@router.put("/facilities/{facility_id}", response_model=loc_schemas.FacilityResponse, summary="시설 정보 업데이트")
+@router.put("/facilities/{facility_id}", response_model=loc_schemas.FacilityRead, summary="시설 정보 업데이트")
 async def update_facility(
     facility_id: int,
     facility_update: loc_schemas.FacilityUpdate,
@@ -127,7 +127,7 @@ async def delete_facility(
     `ON DELETE RESTRICT` 또는 `ON DELETE CASCADE` 정책에 따라 삭제가 실패하거나 연쇄 삭제될 수 있습니다.
     - `facility_id`: 삭제할 시설의 고유 ID
     """
-    db_facility = await loc_crud.facility.delete(db, id=facility_id)
+    db_facility = await loc_crud.facility.remove(db, id=facility_id)
     if db_facility is None:
         raise HTTPException(status_code=404, detail="Facility not found")
     return {}
@@ -136,7 +136,7 @@ async def delete_facility(
 # =============================================================================
 # 2. loc.location_types 엔드포인트 (장소 유형 관리)
 # =============================================================================
-@router.post("/location_types/", response_model=loc_schemas.LocationTypeResponse, status_code=status.HTTP_201_CREATED, summary="새 장소 유형 생성")
+@router.post("/location_types/", response_model=loc_schemas.LocationTypeRead, status_code=status.HTTP_201_CREATED, summary="새 장소 유형 생성")
 async def create_location_type(
     location_type_create: loc_schemas.LocationTypeCreate,
     db: Session = Depends(get_db_session_dependency),
@@ -153,7 +153,7 @@ async def create_location_type(
     return await loc_crud.location_type.create(db=db, obj_in=location_type_create)
 
 
-@router.get("/location_types/", response_model=List[loc_schemas.LocationTypeResponse], summary="모든 장소 유형 목록 조회")
+@router.get("/location_types/", response_model=List[loc_schemas.LocationTypeRead], summary="모든 장소 유형 목록 조회")
 async def read_location_types(
     skip: int = 0,
     limit: int = 100,
@@ -168,7 +168,7 @@ async def read_location_types(
     return location_types
 
 
-@router.get("/location_types/{location_type_id}", response_model=loc_schemas.LocationTypeResponse, summary="특정 장소 유형 정보 조회")
+@router.get("/location_types/{location_type_id}", response_model=loc_schemas.LocationTypeRead, summary="특정 장소 유형 정보 조회")
 async def read_location_type(
     location_type_id: int,
     db: Session = Depends(get_db_session_dependency)
@@ -183,7 +183,7 @@ async def read_location_type(
     return db_location_type
 
 
-@router.put("/location_types/{location_type_id}", response_model=loc_schemas.LocationTypeResponse, summary="장소 유형 정보 업데이트")
+@router.put("/location_types/{location_type_id}", response_model=loc_schemas.LocationTypeRead, summary="장소 유형 정보 업데이트")
 async def update_location_type(
     location_type_id: int,
     location_type_update: loc_schemas.LocationTypeUpdate,
@@ -219,7 +219,7 @@ async def delete_location_type(
     참고: 이 유형을 참조하는 장소 데이터가 있다면 `ON DELETE RESTRICT` 정책에 따라 삭제가 실패합니다.
     - `location_type_id`: 삭제할 장소 유형의 고유 ID
     """
-    db_location_type = await loc_crud.location_type.delete(db, id=location_type_id)
+    db_location_type = await loc_crud.location_type.remove(db, id=location_type_id)
     if db_location_type is None:
         raise HTTPException(status_code=404, detail="Location type not found")
     return {}
@@ -228,7 +228,7 @@ async def delete_location_type(
 # =============================================================================
 # 3. loc.locations 엔드포인트 (시설 내 장소 관리)
 # =============================================================================
-@router.post("/locations/", response_model=loc_schemas.LocationResponse, status_code=status.HTTP_201_CREATED, summary="새 장소 생성")
+@router.post("/locations/", response_model=loc_schemas.LocationRead, status_code=status.HTTP_201_CREATED, summary="새 장소 생성")
 async def create_location(
     location_create: loc_schemas.LocationCreate,
     db: Session = Depends(get_db_session_dependency),
@@ -271,7 +271,7 @@ async def create_location(
     return await loc_crud.location.create(db=db, obj_in=location_create)
 
 
-@router.get("/locations/", response_model=List[loc_schemas.LocationResponse], summary="모든 장소 목록 조회")
+@router.get("/locations/", response_model=List[loc_schemas.LocationRead], summary="모든 장소 목록 조회")
 async def read_locations(
     facility_id: Optional[int] = None,
     skip: int = 0,
@@ -295,7 +295,7 @@ async def read_locations(
     return locations
 
 
-@router.get("/locations/{location_id}", response_model=loc_schemas.LocationResponse, summary="특정 장소 정보 조회")
+@router.get("/locations/{location_id}", response_model=loc_schemas.LocationRead, summary="특정 장소 정보 조회")
 async def read_location(
     location_id: int,
     db: Session = Depends(get_db_session_dependency)
@@ -310,7 +310,7 @@ async def read_location(
     return db_location
 
 
-@router.put("/locations/{location_id}", response_model=loc_schemas.LocationResponse, summary="장소 정보 업데이트")
+@router.put("/locations/{location_id}", response_model=loc_schemas.LocationRead, summary="장소 정보 업데이트")
 async def update_location(
     location_id: int,
     location_update: loc_schemas.LocationUpdate,
@@ -383,7 +383,7 @@ async def delete_location(
     `ON DELETE CASCADE` 또는 `ON DELETE RESTRICT` 정책에 따라 삭제가 연쇄되거나 실패할 수 있습니다.
     - `location_id`: 삭제할 장소의 고유 ID
     """
-    db_location = await loc_crud.location.delete(db, id=location_id)
+    db_location = await loc_crud.location.remove(db, id=location_id)
     if db_location is None:
         raise HTTPException(status_code=404, detail="Location not found")
     return {}

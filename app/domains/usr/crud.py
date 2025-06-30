@@ -5,8 +5,8 @@
 비동기 문법을 올바르게 사용하여 데이터베이스 쿼리를 실행합니다.
 """
 
-from typing import List, Optional, Type, Any
-from sqlmodel import select, SQLModel
+from typing import Optional  # , Type, List, Any
+from sqlmodel import select  # , SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 from fastapi import HTTPException, status
 
@@ -25,14 +25,18 @@ class CRUDDepartment(CRUDBase[usr_models.Department, usr_schemas.DepartmentCreat
         super().__init__(model=usr_models.Department)
 
     async def get_by_name(self, db: AsyncSession, *, name: str) -> Optional[usr_models.Department]:
-        statement = select(self.model).where(self.model.name == name)
-        result = await db.execute(statement)
-        return result.scalars().one_or_none()
+        # statement = select(self.model).where(self.model.name == name)
+        # result = await db.execute(statement)
+        # return result.scalars().one_or_none()
+        # 중복된 select 구문 대신, 부모의 범용 메서드를 호출
+        return await self.get_by_attribute(db, attribute="name", value=name)
 
     async def get_by_code(self, db: AsyncSession, *, code: str) -> Optional[usr_models.Department]:
-        statement = select(self.model).where(self.model.code == code)
-        result = await db.execute(statement)
-        return result.scalars().one_or_none()
+        # statement = select(self.model).where(self.model.code == code)
+        # result = await db.execute(statement)
+        # return result.scalars().one_or_none()
+        # 중복된 select 구문 대신, 부모의 범용 메서드를 호출
+        return await self.get_by_attribute(db, attribute="code", value=code)
 
     async def create(self, db: AsyncSession, *, obj_in: usr_schemas.DepartmentCreate) -> usr_models.Department:
         if await self.get_by_code(db, code=obj_in.code):
@@ -80,16 +84,17 @@ class CRUDUser(CRUDBase[usr_models.User, usr_schemas.UserCreate, usr_schemas.Use
 
     async def get_by_username(self, db: AsyncSession, *, username: str) -> Optional[usr_models.User]:
         """사용자명으로 사용자를 조회합니다."""
-        statement = select(self.model).where(self.model.username == username)
-        # [수정] 올바른 비동기 쿼리 실행 방식으로 변경
-        result = await db.execute(statement)
-        return result.scalars().one_or_none()
+        # statement = select(self.model).where(self.model.username == username)
+        # result = await db.execute(statement)
+        # return result.scalars().one_or_none()
+        return await self.get_by_attribute(db, attribute="username", value=username)
 
     async def get_by_email(self, db: AsyncSession, *, email: str) -> Optional[usr_models.User]:
         """이메일로 사용자를 조회합니다."""
-        statement = select(self.model).where(self.model.email == email)
-        result = await db.execute(statement)
-        return result.scalars().one_or_none()
+        # statement = select(self.model).where(self.model.email == email)
+        # result = await db.execute(statement)
+        # return result.scalars().one_or_none()
+        return await self.get_by_attribute(db, attribute="email", value=email)
 
     async def create(self, db: AsyncSession, *, obj_in: usr_schemas.UserCreate) -> usr_models.User:
         """새로운 사용자를 생성하며 비밀번호를 해싱하고 중복을 검사합니다."""

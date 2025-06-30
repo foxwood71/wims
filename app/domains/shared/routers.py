@@ -38,7 +38,7 @@ router = APIRouter(
 # =============================================================================
 # 1. app.versions 엔드포인트
 # =============================================================================
-@router.post("/versions", response_model=shared_schemas.VersionResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/versions", response_model=shared_schemas.VersionRead, status_code=status.HTTP_201_CREATED)
 async def create_version(
     version_create: shared_schemas.VersionCreate,
     db: Session = Depends(get_db_session_dependency),
@@ -54,7 +54,7 @@ async def create_version(
     return await shared_crud.version.create(db=db, obj_in=version_create)
 
 
-@router.get("/versions", response_model=List[shared_schemas.VersionResponse])
+@router.get("/versions", response_model=List[shared_schemas.VersionRead])
 async def read_versions(
     skip: int = 0,
     limit: int = 100,
@@ -67,7 +67,7 @@ async def read_versions(
     return versions
 
 
-@router.get("/versions/{version_id}", response_model=shared_schemas.VersionResponse)
+@router.get("/versions/{version_id}", response_model=shared_schemas.VersionRead)
 async def read_version(
     version_id: int,
     db: Session = Depends(get_db_session_dependency)
@@ -81,7 +81,7 @@ async def read_version(
     return db_version
 
 
-@router.put("/versions/{version_id}", response_model=shared_schemas.VersionResponse)
+@router.put("/versions/{version_id}", response_model=shared_schemas.VersionRead)
 async def update_version(
     version_id: int,
     version_update: shared_schemas.VersionUpdate,
@@ -118,7 +118,7 @@ async def delete_version(
 # =============================================================================
 # 2. app.image_types 엔드포인트
 # =============================================================================
-@router.post("/image_types", response_model=shared_schemas.ImageTypeResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/image_types", response_model=shared_schemas.ImageTypeRead, status_code=status.HTTP_201_CREATED)
 async def create_image_type(
     image_type_create: shared_schemas.ImageTypeCreate,
     db: Session = Depends(get_db_session_dependency),
@@ -134,7 +134,7 @@ async def create_image_type(
     return await shared_crud.image_type.create(db=db, obj_in=image_type_create)
 
 
-@router.get("/image_types", response_model=List[shared_schemas.ImageTypeResponse])
+@router.get("/image_types", response_model=List[shared_schemas.ImageTypeRead])
 async def read_image_types(
     skip: int = 0,
     limit: int = 100,
@@ -147,7 +147,7 @@ async def read_image_types(
     return image_types
 
 
-@router.get("/image_types/{image_type_id}", response_model=shared_schemas.ImageTypeResponse)
+@router.get("/image_types/{image_type_id}", response_model=shared_schemas.ImageTypeRead)
 async def read_image_type(
     image_type_id: int,
     db: Session = Depends(get_db_session_dependency)
@@ -161,7 +161,7 @@ async def read_image_type(
     return db_image_type
 
 
-@router.put("/image_types/{image_type_id}", response_model=shared_schemas.ImageTypeResponse)
+@router.put("/image_types/{image_type_id}", response_model=shared_schemas.ImageTypeRead)
 async def update_image_type(
     image_type_id: int,
     image_type_update: shared_schemas.ImageTypeUpdate,
@@ -199,7 +199,7 @@ async def delete_image_type(
 # =============================================================================
 # 3. app.images 엔드포인트 (파일 업로드 포함)
 # =============================================================================
-@router.post("/images", response_model=shared_schemas.ImageResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/images", response_model=shared_schemas.ImageRead, status_code=status.HTTP_201_CREATED)
 async def upload_image(
     file: UploadFile = File(...),
     image_type_id: Optional[int] = Form(None),
@@ -246,7 +246,7 @@ async def upload_image(
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Image upload failed: {e}")
 
 
-@router.get("/images", response_model=List[shared_schemas.ImageResponse])
+@router.get("/images", response_model=List[shared_schemas.ImageRead])
 async def read_images(
     skip: int = 0,
     limit: int = 100,
@@ -262,7 +262,7 @@ async def read_images(
         return await shared_crud.image.get_multi(db, skip=skip, limit=limit)
 
 
-@router.get("/images/{image_id}", response_model=shared_schemas.ImageResponse)
+@router.get("/images/{image_id}", response_model=shared_schemas.ImageRead)
 async def read_image(
     image_id: int,
     db: Session = Depends(get_db_session_dependency)
@@ -276,7 +276,7 @@ async def read_image(
     return db_image
 
 
-@router.put("/images/{image_id}", response_model=shared_schemas.ImageResponse)
+@router.put("/images/{image_id}", response_model=shared_schemas.ImageRead)
 async def update_image(
     image_id: int,
     image_update: shared_schemas.ImageUpdate,
@@ -360,7 +360,7 @@ async def delete_image(
 # =============================================================================
 # 4. app.entity_images 엔드포인트
 # =============================================================================
-@router.post("/entity_images", response_model=shared_schemas.EntityImageResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/entity_images", response_model=shared_schemas.EntityImageRead, status_code=status.HTTP_201_CREATED)
 async def create_entity_image(
     entity_image_create: shared_schemas.EntityImageCreate,
     db: Session = Depends(get_db_session_dependency),
@@ -376,7 +376,7 @@ async def create_entity_image(
     return await shared_crud.entity_image.create(db=db, obj_in=entity_image_create)
 
 
-@router.get("/entity_images/by_entity/{entity_type}/{entity_id}", response_model=List[shared_schemas.EntityImageResponse])
+@router.get("/entity_images/by_entity/{entity_type}/{entity_id}", response_model=List[shared_schemas.EntityImageRead])
 async def read_entity_images_for_entity(
     entity_type: str,
     entity_id: int,
@@ -388,7 +388,7 @@ async def read_entity_images_for_entity(
     return await shared_crud.entity_image.get_by_entity(db, entity_type=entity_type, entity_id=entity_id)
 
 
-@router.put("/entity_images/{entity_image_id}/set_main", response_model=shared_schemas.EntityImageResponse)
+@router.put("/entity_images/{entity_image_id}/set_main", response_model=shared_schemas.EntityImageRead)
 async def set_main_entity_image(
     entity_image_id: int,
     entity_type: str,

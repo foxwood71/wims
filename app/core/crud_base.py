@@ -49,6 +49,13 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         result = await db.execute(query)
         return result.scalars().all()
 
+    async def get_by_attribute(
+        self, db: AsyncSession, *, attribute: str, value: Any
+    ) -> Optional[ModelType]:
+        statement = select(self.model).where(getattr(self.model, attribute) == value)
+        response = await db.execute(statement)
+        return response.scalar_one_or_none()
+
     async def create(self, db: AsyncSession, *, obj_in: CreateSchemaType) -> ModelType:
         """
         새로운 레코드를 생성합니다.
@@ -70,7 +77,7 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         update_data = obj_in.model_dump(exclude_unset=True)
         for key, value in update_data.items():
             setattr(db_obj, key, value)
-        
+
         db.add(db_obj)
         await db.commit()
         await db.refresh(db_obj)

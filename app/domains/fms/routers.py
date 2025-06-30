@@ -422,9 +422,9 @@ async def delete_equipment_spec(
 
 
 #  =============================================================================
-#  6. fms.equipment_history 엔드포인트 (설비 이력 관리)
+#  6. fms.equipment_histories 엔드포인트 (설비 이력 관리)
 #  =============================================================================
-@router.post("/equipment_history", response_model=fms_schemas.EquipmentHistoryResponse, status_code=status.HTTP_201_CREATED, summary="새 설비 이력 기록 생성")
+@router.post("equipment_histories", response_model=fms_schemas.EquipmentHistoryResponse, status_code=status.HTTP_201_CREATED, summary="새 설비 이력 기록 생성")
 async def create_equipment_history(
     history_create: fms_schemas.EquipmentHistoryCreate,
     db: Session = Depends(get_db_session_dependency),
@@ -447,9 +447,10 @@ async def create_equipment_history(
 
     return await fms_crud.equipment_history.create(db=db, obj_in=history_create)
 
-
-@router.get("/equipments/{equipment_id}/history", response_model=List[fms_schemas.EquipmentHistoryResponse], summary="특정 설비의 모든 이력 기록 조회")
-async def read_equipment_history(
+# 이 엔드포인트는 특정 설비(equipment)에 종속된 이력(histories)을 조회하는 것이므로
+# /equipments/{equipment_id}/histories 로 변경하는 것이 더 RESTful합니다.
+@router.get("/equipments/{equipment_id}/histories", response_model=List[fms_schemas.EquipmentHistoryResponse], summary="특정 설비의 모든 이력 기록 조회")
+async def read_equipment_histories(
     equipment_id: int,
     skip: int = 0,
     limit: int = 100,
@@ -464,7 +465,7 @@ async def read_equipment_history(
     return await fms_crud.equipment_history.get_by_equipment_id_with_paging(db, equipment_id=equipment_id, skip=skip, limit=limit)
 
 
-@router.get("/equipment_history/{history_id}", response_model=fms_schemas.EquipmentHistoryResponse, summary="특정 설비 이력 기록 조회")
+@router.get("/equipment_histories/{history_id}", response_model=fms_schemas.EquipmentHistoryResponse, summary="특정 설비 이력 기록 조회")
 async def read_single_equipment_history(
     history_id: int,
     db: Session = Depends(get_db_session_dependency)
@@ -478,7 +479,7 @@ async def read_single_equipment_history(
     return db_history
 
 
-@router.put("/equipment_history/{history_id}", response_model=fms_schemas.EquipmentHistoryResponse, summary="설비 이력 기록 업데이트")
+@router.put("/equipment_histories/{history_id}", response_model=fms_schemas.EquipmentHistoryResponse, summary="설비 이력 기록 업데이트")
 async def update_equipment_history(
     history_id: int,
     history_update: fms_schemas.EquipmentHistoryUpdate,
@@ -495,7 +496,7 @@ async def update_equipment_history(
     return await fms_crud.equipment_history.update(db=db, db_obj=db_history, obj_in=history_update)
 
 
-@router.delete("/equipment_history/{history_id}", status_code=status.HTTP_204_NO_CONTENT, summary="설비 이력 기록 삭제")
+@router.delete("/equipment_histories/{history_id}", status_code=status.HTTP_204_NO_CONTENT, summary="설비 이력 기록 삭제")
 async def delete_equipment_history(
     history_id: int,
     db: Session = Depends(get_db_session_dependency),

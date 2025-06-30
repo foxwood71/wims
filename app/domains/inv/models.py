@@ -2,6 +2,7 @@
 
 """
 'inv' 도메인 (PostgreSQL 'inv' 스키마)의 데이터베이스 ORM 모델을 정의하는 모듈입니다.
+
 """
 
 from typing import Optional, List, Dict, Any, TYPE_CHECKING
@@ -15,7 +16,7 @@ from sqlalchemy.types import TIMESTAMP, REAL, DATE
 
 # 순환 임포트 방지를 위한 TYPE_CHECKING
 if TYPE_CHECKING:
-    from app.domains.fms.models import Equipment, EquipmentHistory
+    from app.domains.fms.models import Equipment  # , EquipmentHistory
     from app.domains.loc.models import Facility, Location
     from app.domains.usr.models import User
     from app.domains.ven.models import Vendor
@@ -159,7 +160,10 @@ class Material(MaterialBase, table=True):
     related_equipment: Optional["Equipment"] = Relationship(back_populates="related_materials")
     specs: Optional["MaterialSpec"] = Relationship(
         back_populates="material",
-        sa_relationship_kwargs={'cascade': 'all, delete-orphan'}
+        sa_relationship_kwargs={
+            "uselist": False,  # 1. specs가 리스트가 아닌 단일 객체임을 명시
+            'cascade': 'all, delete-orphan'
+        }
     )
     batches: List["MaterialBatch"] = Relationship(
         back_populates="material",
@@ -206,8 +210,7 @@ class MaterialSpec(MaterialSpecBase, table=True):
     )
 
     material: "Material" = Relationship(
-        back_populates="specs",
-        sa_relationship_kwargs={'uselist': False}
+        back_populates="specs"
     )
 
 

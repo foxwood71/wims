@@ -7,11 +7,14 @@
 """
 
 from typing import Optional, List, Dict, Any, TYPE_CHECKING
+from enum import Enum as PythonEnum
 from datetime import datetime, date, UTC
-from sqlalchemy import Numeric, ForeignKey, Integer
+
+from sqlalchemy import Numeric, ForeignKey, Integer, Enum as SQLAlchemyEnum
 from sqlalchemy.types import TIMESTAMP
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.sql import func
+
 from sqlmodel import Field, Relationship, SQLModel, Column
 
 
@@ -22,6 +25,14 @@ if TYPE_CHECKING:
     from app.domains.ven.models import Vendor
     from app.domains.inv.models import Material, MaterialTransaction
     from app.domains.lims.models import Parameter, CalibrationRecord
+
+
+class EquipmentStatus(str, PythonEnum):  # 장비 상태 Enum 클래스 정의
+    """장비 상태 Enum"""
+    ACTIVE = "active"
+    INACTIVE = "inactive"
+    MAINTENANCE = "maintenance"
+    REMOVED = "removed"
 
 
 # =============================================================================
@@ -145,7 +156,10 @@ class EquipmentBase(SQLModel):
     purchase_date: Optional[date] = Field(default=None)
     purchase_price: Optional[float] = Field(default=None, sa_column=Column(Numeric(18, 2)))
     expected_lifespan_years: Optional[int] = Field(default=None)
-    status: str = Field(default='OPERATIONAL', max_length=50)
+    # status: str = Field(default='OPERATIONAL', max_length=50)
+    status: EquipmentStatus = Field(
+        default=EquipmentStatus.ACTIVE, sa_column=Column(SQLAlchemyEnum(EquipmentStatus), nullable=False)
+    )
     asset_tag: Optional[str] = Field(default=None, max_length=100, unique=True)
     notes: Optional[str] = Field(default=None)
 
