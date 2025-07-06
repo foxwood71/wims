@@ -29,6 +29,8 @@ from app.domains.fms.routers import router as fms_router
 from app.domains.inv.routers import router as inv_router
 from app.domains.lims.routers import router as lims_router
 from app.domains.ops.routers import router as ops_router
+from app.domains.corp.routers import router as corp_router
+from app.domains.rpt.routers import router as rpt_router
 
 # ARQ 워커가 실행할 태스크 함수 목록
 worker_functions = [
@@ -166,6 +168,8 @@ app.include_router(fms_router, prefix=f"{API_PREFIX}/fms", tags=["Facility Manag
 app.include_router(inv_router, prefix=f"{API_PREFIX}/inv", tags=["Inventory Management (자재 관리)"])
 app.include_router(lims_router, prefix=f"{API_PREFIX}/lims", tags=["Laboratory Information Management (실험실 정보 관리)"])
 app.include_router(ops_router, prefix=f"{API_PREFIX}/ops", tags=["Operations Information Management (운영 정보 관리)"])
+app.include_router(corp_router, prefix=f"{API_PREFIX}/corp", tags=["Corporation Information Management (회사 정보 관리)"])
+app.include_router(rpt_router, prefix=f"{API_PREFIX}/rpt", tags=["Report Management (보고서 관리)"])
 
 
 # -- 루트 엔드포인트 --

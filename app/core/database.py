@@ -12,7 +12,7 @@ from typing import AsyncGenerator
 from contextlib import asynccontextmanager
 
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncEngine  # 비동기 엔진 생성 함수와 타입 임포트
-from sqlalchemy.orm import configure_mappers, sessionmaker 
+from sqlalchemy.orm import configure_mappers, sessionmaker
 from sqlalchemy import text  # 스키마 생성 시 text 함수 필요
 
 from sqlmodel import SQLModel
@@ -28,6 +28,8 @@ from app.core.config import settings
 # 명시적으로 임포트해야 합니다. 이렇게 해야 SQLAlchemy 매퍼가 모든 모델과
 # 그 관계를 인식하고 'configure_mappers()'가 올바르게 작동할 수 있습니다.
 # 이 임포트들은 각 모델 파일 내의 TYPE_CHECKING 블록과는 별개로 런타임에 필요합니다.
+
+
 import app.domains.shared.models
 import app.domains.usr.models
 import app.domains.loc.models
@@ -36,6 +38,8 @@ import app.domains.fms.models
 import app.domains.inv.models
 import app.domains.lims.models
 import app.domains.ops.models
+import app.domains.corp.models
+import app.domains.rpt.models  # noqa: F401
 
 
 # SQLModel 엔진을 생성합니다.

@@ -20,11 +20,14 @@ FastAPI 애플리케이션의 'fms' 도메인 패키지입니다.
 패키지의 목적을 문서화합니다.
 """
 
+
+from . import models, schemas, router, crud  # noqa: F401
+
 # 패키지 메타데이터 (선택 사항)
 __title__ = "WIMS FMS Domain"
 __description__ = "Manages equipment information, categories, specs, and history."
-__version__ = "0.1.0" # fms 도메인 패키지의 버전
-__all__ = [] # 'from app.domains.fms import *' 시 내보낼 이름 목록. 일반적으로 비워둡니다.
+__version__ = "0.1.0"  # fms 도메인 패키지의 버전
+__all__ = []  # 'from app.domains.fms import *' 시 내보낼 이름 목록. 일반적으로 비워둡니다.
 
 # (선택 사항) 이 패키지에서 다른 패키지로 공통 모델이나 스키마를 노출할 수 있습니다.
 # 예를 들어, Equipment 모델이 다른 도메인에서 자주 참조된다면 여기서 노출할 수 있습니다.

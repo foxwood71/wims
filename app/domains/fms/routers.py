@@ -16,13 +16,13 @@ from fastapi.encoders import jsonable_encoder
 from sqlmodel import Session
 
 #  핵심 의존성 (데이터베이스 세션, 사용자 인증 등)
-from app.core.dependencies import get_db_session_dependency, get_current_active_user, get_current_admin_user
+from app.core import dependencies as deps
 from app.domains.usr.models import User as UsrUser  # 사용자 모델 (권한 검증용)
 from app.domains.usr import crud as usr_crud
 
 #  'fms' 도메인의 CRUD, 모델, 스키마
 from app.domains.fms import crud as fms_crud
-from app.domains.fms import models as fms_models
+# from app.domains.fms import models as fms_models
 from app.domains.fms import schemas as fms_schemas
 
 #  다른 도메인의 CRUD (FK 유효성 검증용)
@@ -43,8 +43,8 @@ router = APIRouter(
 @router.post("/equipment_categories", response_model=fms_schemas.EquipmentCategoryResponse, status_code=status.HTTP_201_CREATED, summary="새 설비 카테고리 생성")
 async def create_equipment_category(
     category_create: fms_schemas.EquipmentCategoryCreate,
-    db: Session = Depends(get_db_session_dependency),
-    current_user: UsrUser = Depends(get_current_admin_user)
+    db: Session = Depends(deps.get_db_session),
+    current_user: UsrUser = Depends(deps.get_current_admin_user)
 ):
     """
     새로운 설비 카테고리를 생성합니다. (관리자 권한 필요)
@@ -57,7 +57,7 @@ async def create_equipment_category(
 async def read_equipment_categories(
     skip: int = 0,
     limit: int = 100,
-    db: Session = Depends(get_db_session_dependency)
+    db: Session = Depends(deps.get_db_session)
 ):
     """
     모든 설비 카테고리 목록을 조회합니다.
@@ -68,7 +68,7 @@ async def read_equipment_categories(
 @router.get("/equipment_categories/{category_id}", response_model=fms_schemas.EquipmentCategoryResponse, summary="특정 설비 카테고리 정보 조회")
 async def read_equipment_category(
     category_id: int,
-    db: Session = Depends(get_db_session_dependency)
+    db: Session = Depends(deps.get_db_session)
 ):
     """
     특정 ID의 설비 카테고리 정보를 조회합니다.
@@ -83,8 +83,8 @@ async def read_equipment_category(
 async def update_equipment_category(
     category_id: int,
     category_update: fms_schemas.EquipmentCategoryUpdate,
-    db: Session = Depends(get_db_session_dependency),
-    current_user: UsrUser = Depends(get_current_admin_user)
+    db: Session = Depends(deps.get_db_session),
+    current_user: UsrUser = Depends(deps.get_current_admin_user)
 ):
     """
     특정 ID의 설비 카테고리 정보를 업데이트합니다. (관리자 권한 필요)
@@ -104,8 +104,8 @@ async def update_equipment_category(
 @router.delete("/equipment_categories/{category_id}", status_code=status.HTTP_204_NO_CONTENT, summary="설비 카테고리 삭제")
 async def delete_equipment_category(
     category_id: int,
-    db: Session = Depends(get_db_session_dependency),
-    current_user: UsrUser = Depends(get_current_admin_user)
+    db: Session = Depends(deps.get_db_session),
+    current_user: UsrUser = Depends(deps.get_current_admin_user)
 ):
     """
     특정 ID의 설비 카테고리를 삭제합니다. (관리자 권한 필요)
@@ -122,8 +122,8 @@ async def delete_equipment_category(
 @router.post("/equipment_spec_definitions", response_model=fms_schemas.EquipmentSpecDefinitionResponse, status_code=status.HTTP_201_CREATED, summary="새 설비 스펙 정의 생성")
 async def create_equipment_spec_definition(
     spec_def_create: fms_schemas.EquipmentSpecDefinitionCreate,
-    db: Session = Depends(get_db_session_dependency),
-    current_user: UsrUser = Depends(get_current_admin_user)
+    db: Session = Depends(deps.get_db_session),
+    current_user: UsrUser = Depends(deps.get_current_admin_user)
 ):
     """
     새로운 설비 스펙 정의 항목을 생성합니다. (관리자 권한 필요)
@@ -135,7 +135,7 @@ async def create_equipment_spec_definition(
 async def read_equipment_spec_definitions(
     skip: int = 0,
     limit: int = 100,
-    db: Session = Depends(get_db_session_dependency)
+    db: Session = Depends(deps.get_db_session)
 ):
     """
     모든 설비 스펙 정의 목록을 조회합니다.
@@ -146,7 +146,7 @@ async def read_equipment_spec_definitions(
 @router.get("/equipment_spec_definitions/{spec_def_id}", response_model=fms_schemas.EquipmentSpecDefinitionResponse, summary="특정 설비 스펙 정의 정보 조회")
 async def read_equipment_spec_definition(
     spec_def_id: int,
-    db: Session = Depends(get_db_session_dependency)
+    db: Session = Depends(deps.get_db_session)
 ):
     """
     특정 ID의 설비 스펙 정의 정보를 조회합니다.
@@ -161,8 +161,8 @@ async def read_equipment_spec_definition(
 async def update_equipment_spec_definition(
     spec_def_id: int,
     spec_def_update: fms_schemas.EquipmentSpecDefinitionUpdate,
-    db: Session = Depends(get_db_session_dependency),
-    current_user: UsrUser = Depends(get_current_admin_user)
+    db: Session = Depends(deps.get_db_session),
+    current_user: UsrUser = Depends(deps.get_current_admin_user)
 ):
     """
     특정 ID의 설비 스펙 정의 정보를 업데이트합니다. (관리자 권한 필요)
@@ -183,8 +183,8 @@ async def update_equipment_spec_definition(
 @router.delete("/equipment_spec_definitions/{spec_def_id}", status_code=status.HTTP_204_NO_CONTENT, summary="설비 스펙 정의 삭제")
 async def delete_equipment_spec_definition(
     spec_def_id: int,
-    db: Session = Depends(get_db_session_dependency),
-    current_user: UsrUser = Depends(get_current_admin_user)
+    db: Session = Depends(deps.get_db_session),
+    current_user: UsrUser = Depends(deps.get_current_admin_user)
 ):
     """
     특정 ID의 설비 스펙 정의를 삭제합니다. (관리자 권한 필요)
@@ -201,8 +201,8 @@ async def delete_equipment_spec_definition(
 @router.post("/equipment_category_spec_definitions", response_model=fms_schemas.EquipmentCategorySpecDefinitionResponse, status_code=status.HTTP_201_CREATED, summary="설비 카테고리에 스펙 정의 연결")
 async def add_spec_definition_to_category(
     link_create: fms_schemas.EquipmentCategorySpecDefinitionCreate,
-    db: Session = Depends(get_db_session_dependency),
-    current_user: UsrUser = Depends(get_current_admin_user)
+    db: Session = Depends(deps.get_db_session),
+    current_user: UsrUser = Depends(deps.get_current_admin_user)
 ):
     """
     특정 설비 카테고리에 스펙 정의를 연결합니다. (관리자 권한 필요)
@@ -228,7 +228,7 @@ async def add_spec_definition_to_category(
 @router.get("/equipment_categories/{category_id}/spec_definitions", response_model=List[fms_schemas.EquipmentSpecDefinitionResponse], summary="특정 설비 카테고리의 모든 스펙 정의 조회")
 async def read_spec_definitions_for_category(
     category_id: int,
-    db: Session = Depends(get_db_session_dependency)
+    db: Session = Depends(deps.get_db_session)
 ):
     """
     특정 설비 카테고리에 연결된 모든 스펙 정의 목록을 조회합니다.
@@ -243,8 +243,8 @@ async def read_spec_definitions_for_category(
 async def remove_spec_definition_from_category(
     equipment_category_id: int,
     spec_definition_id: int,
-    db: Session = Depends(get_db_session_dependency),
-    current_user: UsrUser = Depends(get_current_admin_user)
+    db: Session = Depends(deps.get_db_session),
+    current_user: UsrUser = Depends(deps.get_current_admin_user)
 ):
     """
     특정 설비 카테고리와 스펙 정의 간의 연결을 해제합니다. (관리자 권한 필요)
@@ -272,8 +272,8 @@ async def remove_spec_definition_from_category(
 @router.post("/equipments", response_model=fms_schemas.EquipmentResponse, status_code=status.HTTP_201_CREATED, summary="새 설비 생성")
 async def create_equipment(
     equipment_create: fms_schemas.EquipmentCreate,
-    db: Session = Depends(get_db_session_dependency),
-    current_user: UsrUser = Depends(get_current_admin_user)
+    db: Session = Depends(deps.get_db_session),
+    current_user: UsrUser = Depends(deps.get_current_admin_user)
 ):
     """
     새로운 설비를 생성합니다. (관리자 권한 필요)
@@ -309,7 +309,7 @@ async def read_equipments(
     category_id: Optional[int] = None,
     skip: int = 0,
     limit: int = 100,
-    db: Session = Depends(get_db_session_dependency)
+    db: Session = Depends(deps.get_db_session)
 ):
     """
     모든 설비 목록을 조회하거나, 필터링하여 조회합니다.
@@ -325,7 +325,7 @@ async def read_equipments(
 @router.get("/equipments/{equipment_id}", response_model=fms_schemas.EquipmentResponse, summary="특정 설비 정보 조회")
 async def read_equipment(
     equipment_id: int,
-    db: Session = Depends(get_db_session_dependency)
+    db: Session = Depends(deps.get_db_session)
 ):
     """
     특정 ID의 설비 정보를 조회합니다.
@@ -340,8 +340,8 @@ async def read_equipment(
 async def update_equipment(
     equipment_id: int,
     equipment_update: fms_schemas.EquipmentUpdate,
-    db: Session = Depends(get_db_session_dependency),
-    current_user: UsrUser = Depends(get_current_admin_user)
+    db: Session = Depends(deps.get_db_session),
+    current_user: UsrUser = Depends(deps.get_current_admin_user)
 ):
     """
     특정 ID의 설비 정보를 업데이트합니다. (관리자 권한 필요)
@@ -356,8 +356,8 @@ async def update_equipment(
 @router.delete("/equipments/{equipment_id}", status_code=status.HTTP_204_NO_CONTENT, summary="설비 삭제")
 async def delete_equipment(
     equipment_id: int,
-    db: Session = Depends(get_db_session_dependency),
-    current_user: UsrUser = Depends(get_current_admin_user)
+    db: Session = Depends(deps.get_db_session),
+    current_user: UsrUser = Depends(deps.get_current_admin_user)
 ):
     """
     특정 ID의 설비를 삭제합니다. (관리자 권한 필요)
@@ -374,8 +374,8 @@ async def delete_equipment(
 @router.post("/equipment_specs", response_model=fms_schemas.EquipmentSpecResponse, status_code=status.HTTP_201_CREATED, summary="설비 스펙 생성/업데이트")
 async def create_or_update_equipment_spec(
     spec_create_update: fms_schemas.EquipmentSpecCreate,
-    db: Session = Depends(get_db_session_dependency),
-    current_user: UsrUser = Depends(get_current_admin_user)
+    db: Session = Depends(deps.get_db_session),
+    current_user: UsrUser = Depends(deps.get_current_admin_user)
 ):
     """
     특정 설비의 스펙 정보를 생성하거나 업데이트합니다.
@@ -396,7 +396,7 @@ async def create_or_update_equipment_spec(
 @router.get("/equipments/{equipment_id}/specs", response_model=fms_schemas.EquipmentSpecResponse, summary="특정 설비의 스펙 정보 조회")
 async def read_equipment_specs(
     equipment_id: int,
-    db: Session = Depends(get_db_session_dependency)
+    db: Session = Depends(deps.get_db_session)
 ):
     """
     특정 설비의 스펙 정보를 조회합니다.
@@ -410,8 +410,8 @@ async def read_equipment_specs(
 @router.delete("/equipment_specs/{spec_id}", status_code=status.HTTP_204_NO_CONTENT, summary="설비 스펙 삭제")
 async def delete_equipment_spec(
     spec_id: int,
-    db: Session = Depends(get_db_session_dependency),
-    current_user: UsrUser = Depends(get_current_admin_user)
+    db: Session = Depends(deps.get_db_session),
+    current_user: UsrUser = Depends(deps.get_current_admin_user)
 ):
     """
     특정 ID의 설비 스펙을 삭제합니다. (관리자 권한 필요)
@@ -427,8 +427,8 @@ async def delete_equipment_spec(
 @router.post("equipment_histories", response_model=fms_schemas.EquipmentHistoryResponse, status_code=status.HTTP_201_CREATED, summary="새 설비 이력 기록 생성")
 async def create_equipment_history(
     history_create: fms_schemas.EquipmentHistoryCreate,
-    db: Session = Depends(get_db_session_dependency),
-    current_user: UsrUser = Depends(get_current_active_user)
+    db: Session = Depends(deps.get_db_session),
+    current_user: UsrUser = Depends(deps.get_current_active_user)
 ):
     """
     새로운 설비 이력 기록을 생성합니다.
@@ -447,6 +447,7 @@ async def create_equipment_history(
 
     return await fms_crud.equipment_history.create(db=db, obj_in=history_create)
 
+
 # 이 엔드포인트는 특정 설비(equipment)에 종속된 이력(histories)을 조회하는 것이므로
 # /equipments/{equipment_id}/histories 로 변경하는 것이 더 RESTful합니다.
 @router.get("/equipments/{equipment_id}/histories", response_model=List[fms_schemas.EquipmentHistoryResponse], summary="특정 설비의 모든 이력 기록 조회")
@@ -454,7 +455,7 @@ async def read_equipment_histories(
     equipment_id: int,
     skip: int = 0,
     limit: int = 100,
-    db: Session = Depends(get_db_session_dependency)
+    db: Session = Depends(deps.get_db_session)
 ):
     """
     특정 설비의 모든 이력 기록 목록을 조회합니다.
@@ -468,7 +469,7 @@ async def read_equipment_histories(
 @router.get("/equipment_histories/{history_id}", response_model=fms_schemas.EquipmentHistoryResponse, summary="특정 설비 이력 기록 조회")
 async def read_single_equipment_history(
     history_id: int,
-    db: Session = Depends(get_db_session_dependency)
+    db: Session = Depends(deps.get_db_session)
 ):
     """
     특정 ID의 설비 이력 기록을 조회합니다.
@@ -483,8 +484,8 @@ async def read_single_equipment_history(
 async def update_equipment_history(
     history_id: int,
     history_update: fms_schemas.EquipmentHistoryUpdate,
-    db: Session = Depends(get_db_session_dependency),
-    current_user: UsrUser = Depends(get_current_admin_user)
+    db: Session = Depends(deps.get_db_session),
+    current_user: UsrUser = Depends(deps.get_current_admin_user)
 ):
     """
     특정 ID의 설비 이력 기록을 업데이트합니다. (관리자 권한 필요)
@@ -499,8 +500,8 @@ async def update_equipment_history(
 @router.delete("/equipment_histories/{history_id}", status_code=status.HTTP_204_NO_CONTENT, summary="설비 이력 기록 삭제")
 async def delete_equipment_history(
     history_id: int,
-    db: Session = Depends(get_db_session_dependency),
-    current_user: UsrUser = Depends(get_current_admin_user)
+    db: Session = Depends(deps.get_db_session),
+    current_user: UsrUser = Depends(deps.get_current_admin_user)
 ):
     """
     특정 ID의 설비 이력 기록을 삭제합니다. (관리자 권한 필요)

@@ -16,12 +16,12 @@ from datetime import date
 from uuid import UUID
 
 # 핵심 의존성 (데이터베이스 세션, 사용자 인증 등)
-from app.core.dependencies import get_db_session_dependency, get_current_active_user, get_current_admin_user
+from app.core import dependencies as deps
 from app.domains.usr.models import User as UsrUser  # 사용자 모델 (권한 검증용)
 
 # 'ops' 도메인의 CRUD, 모델, 스키마
 from app.domains.ops import crud as ops_crud
-from app.domains.ops import models as ops_models
+# from app.domains.ops import models as ops_models
 from app.domains.ops import schemas as ops_schemas
 
 # 다른 도메인의 CRUD (FK 유효성 검증용)
@@ -41,8 +41,8 @@ router = APIRouter(
 @router.post("/lines", response_model=ops_schemas.LineResponse, status_code=status.HTTP_201_CREATED, summary="새 처리 계열 생성")
 async def create_line(
     line_create: ops_schemas.LineCreate,
-    db: Session = Depends(get_db_session_dependency),
-    current_user: UsrUser = Depends(get_current_admin_user)  # 관리자 이상만 생성 가능
+    db: Session = Depends(deps.get_db_session),
+    current_user: UsrUser = Depends(deps.get_current_admin_user)  # 관리자 이상만 생성 가능
 ):
     """
     새로운 처리 계열을 생성합니다. (관리자 권한 필요)
@@ -70,7 +70,7 @@ async def read_lines(
     facility_id: Optional[int] = None,
     skip: int = 0,
     limit: int = 100,
-    db: Session = Depends(get_db_session_dependency)
+    db: Session = Depends(deps.get_db_session)
 ):
     """
     모든 처리 계열 목록을 조회하거나, 특정 처리시설로 필터링하여 조회합니다.
@@ -81,7 +81,7 @@ async def read_lines(
         db_plant = await loc_crud.wastewater_plant.get(db, id=facility_id)
         if not db_plant:
             raise HTTPException(status_code=404, detail="Plant not found for the given facility_id.")
-        lines = await ops_crud.line.get_multi(db, facility_id=facility_id, skip=skip, limit=limit) #  `get_by_plant` 대신 `get_multi` 사용
+        lines = await ops_crud.line.get_multi(db, facility_id=facility_id, skip=skip, limit=limit)  # `get_by_plant` 대신 `get_multi` 사용
     else:
         lines = await ops_crud.line.get_multi(db, skip=skip, limit=limit)
     return lines
@@ -90,7 +90,7 @@ async def read_lines(
 @router.get("/lines/{line_id}", response_model=ops_schemas.LineResponse, summary="특정 처리 계열 정보 조회")
 async def read_line(
     line_id: int,
-    db: Session = Depends(get_db_session_dependency)
+    db: Session = Depends(deps.get_db_session)
 ):
     """
     특정 ID의 처리 계열 정보를 조회합니다.
@@ -106,8 +106,8 @@ async def read_line(
 async def update_line(
     line_id: int,
     line_update: ops_schemas.LineUpdate,
-    db: Session = Depends(get_db_session_dependency),
-    current_user: UsrUser = Depends(get_current_admin_user)  # 관리자 이상만 업데이트 가능
+    db: Session = Depends(deps.get_db_session),
+    current_user: UsrUser = Depends(deps.get_current_admin_user)  # 관리자 이상만 업데이트 가능
 ):
     """
     특정 ID의 처리 계열 정보를 업데이트합니다. (관리자 권한 필요)
@@ -138,8 +138,8 @@ async def update_line(
 @router.delete("/lines/{line_id}", status_code=status.HTTP_204_NO_CONTENT, summary="처리 계열 삭제")
 async def delete_line(
     line_id: int,
-    db: Session = Depends(get_db_session_dependency),
-    current_user: UsrUser = Depends(get_current_admin_user)  # 관리자 이상만 삭제 가능
+    db: Session = Depends(deps.get_db_session),
+    current_user: UsrUser = Depends(deps.get_current_admin_user)  # 관리자 이상만 삭제 가능
 ):
     """
     특정 ID의 처리 계열을 삭제합니다. (관리자 권한 필요)
@@ -159,8 +159,8 @@ async def delete_line(
 @router.post("/daily_plant_operations", response_model=ops_schemas.DailyPlantOperationResponse, status_code=status.HTTP_201_CREATED, summary="새 일일 처리장 운영 현황 생성")
 async def create_daily_plant_operation(
     op_create: ops_schemas.DailyPlantOperationCreate,
-    db: Session = Depends(get_db_session_dependency),
-    current_user: UsrUser = Depends(get_current_active_user)  # 활성 사용자만 생성 가능
+    db: Session = Depends(deps.get_db_session),
+    current_user: UsrUser = Depends(deps.get_current_admin_user)  # 활성 사용자만 생성 가능
 ):
     """
     새로운 일일 처리장 운영 현황 기록을 생성합니다.
@@ -188,7 +188,7 @@ async def read_daily_plant_operations(
     end_date: Optional[date] = None,
     skip: int = 0,
     limit: int = 100,
-    db: Session = Depends(get_db_session_dependency)
+    db: Session = Depends(deps.get_db_session)
 ):
     """
     모든 일일 처리장 운영 현황 목록을 조회하거나, 필터링하여 조회합니다.
@@ -212,7 +212,7 @@ async def read_daily_plant_operations(
 @router.get("/daily_plant_operations/{op_id}", response_model=ops_schemas.DailyPlantOperationResponse, summary="특정 일일 처리장 운영 현황 정보 조회 (ID 기준)")
 async def read_daily_plant_operation(
     op_id: int,
-    db: Session = Depends(get_db_session_dependency)
+    db: Session = Depends(deps.get_db_session)
 ):
     """
     특정 ID의 일일 처리장 운영 현황 기록을 조회합니다.
@@ -227,7 +227,7 @@ async def read_daily_plant_operation(
 @router.get("/daily_plant_operations/by_global_id/{global_id}", response_model=ops_schemas.DailyPlantOperationResponse, summary="특정 일일 처리장 운영 현황 정보 조회 (Global ID 기준)")
 async def read_daily_plant_operation_by_global_id(
     global_id: UUID,
-    db: Session = Depends(get_db_session_dependency)
+    db: Session = Depends(deps.get_db_session)
 ):
     """
     특정 Global ID (UUID)의 일일 처리장 운영 현황 기록을 조회합니다.
@@ -243,8 +243,8 @@ async def read_daily_plant_operation_by_global_id(
 async def update_daily_plant_operation(
     op_id: int,
     op_update: ops_schemas.DailyPlantOperationUpdate,
-    db: Session = Depends(get_db_session_dependency),
-    current_user: UsrUser = Depends(get_current_admin_user)  # 관리자 이상만 업데이트 가능
+    db: Session = Depends(deps.get_db_session),
+    current_user: UsrUser = Depends(deps.get_current_admin_user)  # 관리자 이상만 업데이트 가능
 ):
     """
     특정 ID의 일일 처리장 운영 현황 기록을 업데이트합니다. (관리자 권한 필요)
@@ -265,8 +265,8 @@ async def update_daily_plant_operation(
 @router.delete("/daily_plant_operations/{op_id}", status_code=status.HTTP_204_NO_CONTENT, summary="일일 처리장 운영 현황 삭제")
 async def delete_daily_plant_operation(
     op_id: int,
-    db: Session = Depends(get_db_session_dependency),
-    current_user: UsrUser = Depends(get_current_admin_user)  # 관리자 이상만 삭제 가능
+    db: Session = Depends(deps.get_db_session),
+    current_user: UsrUser = Depends(deps.get_current_admin_user)  # 관리자 이상만 삭제 가능
 ):
     """
     특정 ID의 일일 처리장 운영 현황 기록을 삭제합니다. (관리자 권한 필요)
@@ -286,8 +286,8 @@ async def delete_daily_plant_operation(
 @router.post("/daily_line_operations", response_model=ops_schemas.DailyLineOperationResponse, status_code=status.HTTP_201_CREATED, summary="새 일일 계열별 운영 현황 생성")
 async def create_daily_line_operation(
     op_create: ops_schemas.DailyLineOperationCreate,
-    db: Session = Depends(get_db_session_dependency),
-    current_user: UsrUser = Depends(get_current_active_user)  # 활성 사용자만 생성 가능
+    db: Session = Depends(deps.get_db_session),
+    current_user: UsrUser = Depends(deps.get_current_admin_user)  # 활성 사용자만 생성 가능
 ):
     """
     새로운 일일 계열별 운영 현황 기록을 생성합니다.
@@ -325,7 +325,7 @@ async def read_daily_line_operations(
     end_date: Optional[date] = None,
     skip: int = 0,
     limit: int = 100,
-    db: Session = Depends(get_db_session_dependency)
+    db: Session = Depends(deps.get_db_session)
 ):
     """
     모든 일일 계열별 운영 현황 목록을 조회하거나, 필터링하여 조회합니다.
@@ -356,7 +356,7 @@ async def read_daily_line_operations(
 @router.get("/daily_line_operations/{op_id}", response_model=ops_schemas.DailyLineOperationResponse, summary="특정 일일 계열별 운영 현황 정보 조회 (ID 기준)")
 async def read_daily_line_operation(
     op_id: int,
-    db: Session = Depends(get_db_session_dependency)
+    db: Session = Depends(deps.get_db_session)
 ):
     """
     특정 ID의 일일 계열별 운영 현황 기록을 조회합니다.
@@ -371,7 +371,7 @@ async def read_daily_line_operation(
 @router.get("/daily_line_operations/by_global_id/{global_id}", response_model=ops_schemas.DailyLineOperationResponse, summary="특정 일일 계열별 운영 현황 정보 조회 (Global ID 기준)")
 async def read_daily_line_operation_by_global_id(
     global_id: UUID,
-    db: Session = Depends(get_db_session_dependency)
+    db: Session = Depends(deps.get_db_session)
 ):
     """
     특정 Global ID (UUID)의 일일 계열별 운영 현황 기록을 조회합니다.
@@ -387,8 +387,8 @@ async def read_daily_line_operation_by_global_id(
 async def update_daily_line_operation(
     op_id: int,
     op_update: ops_schemas.DailyLineOperationUpdate,
-    db: Session = Depends(get_db_session_dependency),
-    current_user: UsrUser = Depends(get_current_admin_user)  # 관리자 이상만 업데이트 가능
+    db: Session = Depends(deps.get_db_session),
+    current_user: UsrUser = Depends(deps.get_current_admin_user)  # 관리자 이상만 업데이트 가능
 ):
     """
     특정 ID의 일일 계열별 운영 현황 기록을 업데이트합니다. (관리자 권한 필요)
@@ -425,8 +425,8 @@ async def update_daily_line_operation(
 @router.delete("/daily_line_operations/{op_id}", status_code=status.HTTP_204_NO_CONTENT, summary="일일 계열별 운영 현황 삭제")
 async def delete_daily_line_operation(
     op_id: int,
-    db: Session = Depends(get_db_session_dependency),
-    current_user: UsrUser = Depends(get_current_admin_user)  # 관리자 이상만 삭제 가능
+    db: Session = Depends(deps.get_db_session),
+    current_user: UsrUser = Depends(deps.get_current_admin_user)  # 관리자 이상만 삭제 가능
 ):
     """
     특정 ID의 일일 계열별 운영 현황 기록을 삭제합니다. (관리자 권한 필요)
@@ -444,8 +444,8 @@ async def delete_daily_line_operation(
 @router.post("/views", response_model=ops_schemas.OpsViewResponse, status_code=status.HTTP_201_CREATED, summary="새 사용자 정의 운영 데이터 보기 생성")
 async def create_ops_view(
     view_create: ops_schemas.OpsViewCreate,
-    db: Session = Depends(get_db_session_dependency),
-    current_user: UsrUser = Depends(get_current_active_user)  # 활성 사용자만 생성 가능
+    db: Session = Depends(deps.get_db_session),
+    current_user: UsrUser = Depends(deps.get_current_admin_user)  # 활성 사용자만 생성 가능
 ):
     """
     새로운 사용자 정의 운영 데이터 보기 설정을 생성합니다.
@@ -479,7 +479,7 @@ async def read_ops_views(
     facility_id: Optional[int] = None,  # 특정 처리장 ID를 포함하는 보기 필터링
     skip: int = 0,
     limit: int = 100,
-    db: Session = Depends(get_db_session_dependency)
+    db: Session = Depends(deps.get_db_session)
 ):
     """
     모든 사용자 정의 운영 데이터 보기 목록을 조회하거나, 필터링하여 조회합니다.
@@ -498,7 +498,7 @@ async def read_ops_views(
 @router.get("/views/{view_id}", response_model=ops_schemas.OpsViewResponse, summary="특정 사용자 정의 운영 데이터 보기 정보 조회")
 async def read_ops_view(
     view_id: int,
-    db: Session = Depends(get_db_session_dependency)
+    db: Session = Depends(deps.get_db_session)
 ):
     """
     특정 ID의 사용자 정의 운영 데이터 보기 설정을 조회합니다.
@@ -514,8 +514,8 @@ async def read_ops_view(
 async def update_ops_view(
     view_id: int,
     view_update: ops_schemas.OpsViewUpdate,
-    db: Session = Depends(get_db_session_dependency),
-    current_user: UsrUser = Depends(get_current_active_user)  # 활성 사용자만 업데이트 가능 (또는 관리자)
+    db: Session = Depends(deps.get_db_session),
+    current_user: UsrUser = Depends(deps.get_current_admin_user)  # 활성 사용자만 업데이트 가능 (또는 관리자)
 ):
     """
     특정 ID의 사용자 정의 운영 데이터 보기 설정을 업데이트합니다.
@@ -545,8 +545,8 @@ async def update_ops_view(
 @router.delete("/views/{view_id}", status_code=status.HTTP_204_NO_CONTENT, summary="사용자 정의 운영 데이터 보기 삭제")
 async def delete_ops_view(
     view_id: int,
-    db: Session = Depends(get_db_session_dependency),
-    current_user: UsrUser = Depends(get_current_active_user)  # 활성 사용자만 삭제 가능 (또는 관리자)
+    db: Session = Depends(deps.get_db_session),
+    current_user: UsrUser = Depends(deps.get_current_admin_user)  # 활성 사용자만 삭제 가능 (또는 관리자)
 ):
     """
     특정 ID의 사용자 정의 운영 데이터 보기 설정을 삭제합니다.
@@ -563,3 +563,39 @@ async def delete_ops_view(
 
     await ops_crud.ops_view.delete(db, id=view_id)
     return {}
+
+
+# ====================================================================
+# [추가] 범용 파일 업로드 라우터
+# ====================================================================
+@router.post(
+    "/files/",
+    response_model=FileRead,
+    status_code=201,
+    tags=["File Management"]
+)
+def upload_general_file(
+    *,
+    session: Session = Depends(get_session),
+    upload_file: UploadFile = File(...)
+):
+    """
+    엑셀, PDF 등 범용 파일을 업로드합니다.
+    """
+    #  파일 저장 위치를 'files' 디렉토리로 지정
+    saved_path = save_upload_file_to_static("files", upload_file)
+
+    file_size = upload_file.file.tell()
+
+    db_file = FileModel(
+        path=saved_path,
+        name=upload_file.filename,
+        content_type=upload_file.content_type,
+        size=file_size,
+    )
+
+    session.add(db_file)
+    session.commit()
+    session.refresh(db_file)
+
+    return db_file

@@ -14,7 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import Session
 
 # 핵심 의존성 (데이터베이스 세션, 사용자 인증 등)
-from app.core.dependencies import get_db_session_dependency, get_current_admin_user  # ,get_current_active_user
+from app.core import dependencies as deps
 from app.domains.usr.models import User as UsrUser  # 사용자 모델 (권한 검증용)
 
 # 'loc' 도메인의 CRUD, 모델, 스키마
@@ -35,8 +35,8 @@ router = APIRouter(
 @router.post("/facilities/", response_model=loc_schemas.FacilityRead, status_code=status.HTTP_201_CREATED, summary="새 시설 생성")
 async def create_facility(
     facility_create: loc_schemas.FacilityCreate,
-    db: Session = Depends(get_db_session_dependency),
-    current_user: UsrUser = Depends(get_current_admin_user)  # 관리자 이상만 생성 가능
+    db: Session = Depends(deps.get_db_session),
+    current_user: UsrUser = Depends(deps.get_current_admin_user)  # 관리자 이상만 생성 가능
 ):
     """
     새로운 시설 정보를 생성합니다. (관리자 권한 필요)
@@ -59,7 +59,7 @@ async def create_facility(
 async def read_facilities(
     skip: int = 0,
     limit: int = 100,
-    db: Session = Depends(get_db_session_dependency)
+    db: Session = Depends(deps.get_db_session)
 ):
     """
     모든 시설 목록을 조회합니다.
@@ -73,7 +73,7 @@ async def read_facilities(
 @router.get("/facilities/{facility_id}", response_model=loc_schemas.FacilityRead, summary="특정 시설 정보 조회")
 async def read_facility(
     facility_id: int,
-    db: Session = Depends(get_db_session_dependency)
+    db: Session = Depends(deps.get_db_session)
 ):
     """
     특정 ID의 시설 정보를 조회합니다.
@@ -89,8 +89,8 @@ async def read_facility(
 async def update_facility(
     facility_id: int,
     facility_update: loc_schemas.FacilityUpdate,
-    db: Session = Depends(get_db_session_dependency),
-    current_user: UsrUser = Depends(get_current_admin_user)  # 관리자 이상만 업데이트 가능
+    db: Session = Depends(deps.get_db_session),
+    current_user: UsrUser = Depends(deps.get_current_admin_user)  # 관리자 이상만 업데이트 가능
 ):
     """
     특정 ID의 시설 정보를 업데이트합니다. (관리자 권한 필요)
@@ -118,8 +118,8 @@ async def update_facility(
 @router.delete("/facilities/{facility_id}", status_code=status.HTTP_204_NO_CONTENT, summary="시설 삭제")
 async def delete_facility(
     facility_id: int,
-    db: Session = Depends(get_db_session_dependency),
-    current_user: UsrUser = Depends(get_current_admin_user)  # 관리자 이상만 삭제 가능
+    db: Session = Depends(deps.get_db_session),
+    current_user: UsrUser = Depends(deps.get_current_admin_user)  # 관리자 이상만 삭제 가능
 ):
     """
     특정 ID의 시설을 삭제합니다. (관리자 권한 필요)
@@ -139,8 +139,8 @@ async def delete_facility(
 @router.post("/location_types/", response_model=loc_schemas.LocationTypeRead, status_code=status.HTTP_201_CREATED, summary="새 장소 유형 생성")
 async def create_location_type(
     location_type_create: loc_schemas.LocationTypeCreate,
-    db: Session = Depends(get_db_session_dependency),
-    current_user: UsrUser = Depends(get_current_admin_user)  # 관리자 이상만 생성 가능
+    db: Session = Depends(deps.get_db_session),
+    current_user: UsrUser = Depends(deps.get_current_admin_user)  # 관리자 이상만 생성 가능
 ):
     """
     새로운 장소 유형을 생성합니다. (관리자 권한 필요)
@@ -157,7 +157,7 @@ async def create_location_type(
 async def read_location_types(
     skip: int = 0,
     limit: int = 100,
-    db: Session = Depends(get_db_session_dependency)
+    db: Session = Depends(deps.get_db_session)
 ):
     """
     모든 장소 유형의 목록을 조회합니다.
@@ -171,7 +171,7 @@ async def read_location_types(
 @router.get("/location_types/{location_type_id}", response_model=loc_schemas.LocationTypeRead, summary="특정 장소 유형 정보 조회")
 async def read_location_type(
     location_type_id: int,
-    db: Session = Depends(get_db_session_dependency)
+    db: Session = Depends(deps.get_db_session)
 ):
     """
     특정 ID의 장소 유형 정보를 조회합니다.
@@ -187,8 +187,8 @@ async def read_location_type(
 async def update_location_type(
     location_type_id: int,
     location_type_update: loc_schemas.LocationTypeUpdate,
-    db: Session = Depends(get_db_session_dependency),
-    current_user: UsrUser = Depends(get_current_admin_user)  # 관리자 이상만 업데이트 가능
+    db: Session = Depends(deps.get_db_session),
+    current_user: UsrUser = Depends(deps.get_current_admin_user)  # 관리자 이상만 업데이트 가능
 ):
     """
     특정 ID의 장소 유형 정보를 업데이트합니다. (관리자 권한 필요)
@@ -211,8 +211,8 @@ async def update_location_type(
 @router.delete("/location_types/{location_type_id}", status_code=status.HTTP_204_NO_CONTENT, summary="장소 유형 삭제")
 async def delete_location_type(
     location_type_id: int,
-    db: Session = Depends(get_db_session_dependency),
-    current_user: UsrUser = Depends(get_current_admin_user)  # 관리자 이상만 삭제 가능
+    db: Session = Depends(deps.get_db_session),
+    current_user: UsrUser = Depends(deps.get_current_admin_user)  # 관리자 이상만 삭제 가능
 ):
     """
     특정 ID의 장소 유형을 삭제합니다. (관리자 권한 필요)
@@ -231,8 +231,8 @@ async def delete_location_type(
 @router.post("/locations/", response_model=loc_schemas.LocationRead, status_code=status.HTTP_201_CREATED, summary="새 장소 생성")
 async def create_location(
     location_create: loc_schemas.LocationCreate,
-    db: Session = Depends(get_db_session_dependency),
-    current_user: UsrUser = Depends(get_current_admin_user)  # 관리자 이상만 생성 가능
+    db: Session = Depends(deps.get_db_session),
+    current_user: UsrUser = Depends(deps.get_current_admin_user)  # 관리자 이상만 생성 가능
 ):
     """
     새로운 장소 정보를 생성합니다. (관리자 권한 필요)
@@ -276,7 +276,7 @@ async def read_locations(
     facility_id: Optional[int] = None,
     skip: int = 0,
     limit: int = 100,
-    db: Session = Depends(get_db_session_dependency)
+    db: Session = Depends(deps.get_db_session)
 ):
     """
     모든 장소 또는 특정 시설에 속한 장소 목록을 조회합니다.
@@ -298,7 +298,7 @@ async def read_locations(
 @router.get("/locations/{location_id}", response_model=loc_schemas.LocationRead, summary="특정 장소 정보 조회")
 async def read_location(
     location_id: int,
-    db: Session = Depends(get_db_session_dependency)
+    db: Session = Depends(deps.get_db_session)
 ):
     """
     특정 ID의 장소 정보를 조회합니다.
@@ -314,8 +314,8 @@ async def read_location(
 async def update_location(
     location_id: int,
     location_update: loc_schemas.LocationUpdate,
-    db: Session = Depends(get_db_session_dependency),
-    current_user: UsrUser = Depends(get_current_admin_user)  # 관리자 이상만 업데이트 가능
+    db: Session = Depends(deps.get_db_session),
+    current_user: UsrUser = Depends(deps.get_current_admin_user)  # 관리자 이상만 업데이트 가능
 ):
     """
     특정 ID의 장소 정보를 업데이트합니다. (관리자 권한 필요)
@@ -374,8 +374,8 @@ async def update_location(
 @router.delete("/locations/{location_id}", status_code=status.HTTP_204_NO_CONTENT, summary="장소 삭제")
 async def delete_location(
     location_id: int,
-    db: Session = Depends(get_db_session_dependency),
-    current_user: UsrUser = Depends(get_current_admin_user)  # 관리자 이상만 삭제 가능
+    db: Session = Depends(deps.get_db_session),
+    current_user: UsrUser = Depends(deps.get_current_admin_user)  # 관리자 이상만 삭제 가능
 ):
     """
     특정 ID의 장소를 삭제합니다. (관리자 권한 필요)

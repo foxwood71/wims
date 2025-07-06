@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request
 # 중앙 의존성 관리 모듈 임포트
 from app.core import dependencies as deps
 from app.domains.usr import models as usr_models
-from app.tasks import lims_tasks as lims_WsItem_task
+# from app.tasks import lims_tasks as lims_WsItem_task
 
 # 도메인 관련 모듈 임포트
 from . import crud as lims_crud
@@ -29,7 +29,7 @@ router = APIRouter(
 @router.post("/parameters", response_model=lims_schemas.ParameterResponse, status_code=status.HTTP_201_CREATED, summary="새 분석 항목 생성")
 async def create_parameter(
     parameter_in: lims_schemas.ParameterCreate,
-    db: AsyncSession = Depends(deps.get_db_session_dependency),
+    db: AsyncSession = Depends(deps.get_db_session),
     current_admin_user: usr_models.User = Depends(deps.get_current_admin_user),
 ):
     """새로운 분석 항목을 생성합니다. 관리자 권한이 필요합니다."""
@@ -41,7 +41,7 @@ async def read_parameters(
     skip: int = 0,
     limit: int = 100,
     analysis_group: Optional[str] = None,  # [추가]
-    db: AsyncSession = Depends(deps.get_db_session_dependency)
+    db: AsyncSession = Depends(deps.get_db_session)
 ):
     """
     모든 활성 분석 항목 목록을 조회합니다.
@@ -50,13 +50,13 @@ async def read_parameters(
     filter_kwargs = {"is_active": True}  # [수정] 항상 활성 항목만 조회
     if analysis_group:
         filter_kwargs["analysis_group"] = analysis_group
-    
+
     return await lims_crud.parameter.get_multi(db, skip=skip, limit=limit, **filter_kwargs)
 
 
 @router.get("/parameters/{parameter_id}", response_model=lims_schemas.ParameterResponse, summary="특정 분석 항목 조회")
 async def read_parameter(
-    parameter_id: int, db: AsyncSession = Depends(deps.get_db_session_dependency)
+    parameter_id: int, db: AsyncSession = Depends(deps.get_db_session)
 ):
     """ID를 기준으로 특정 분석 항목을 조회합니다."""
     db_obj = await lims_crud.parameter.get(db=db, id=parameter_id)
@@ -69,7 +69,7 @@ async def read_parameter(
 async def update_parameter(
     parameter_id: int,
     parameter_in: lims_schemas.ParameterUpdate,
-    db: AsyncSession = Depends(deps.get_db_session_dependency),
+    db: AsyncSession = Depends(deps.get_db_session),
     current_admin_user: usr_models.User = Depends(deps.get_current_admin_user),
 ):
     """ID를 기준으로 분석 항목 정보를 업데이트합니다. 관리자 권한이 필요합니다."""
@@ -82,7 +82,7 @@ async def update_parameter(
 @router.delete("/parameters/{parameter_id}", status_code=status.HTTP_204_NO_CONTENT, summary="분석 항목 삭제")
 async def delete_parameter(
     parameter_id: int,
-    db: AsyncSession = Depends(deps.get_db_session_dependency),
+    db: AsyncSession = Depends(deps.get_db_session),
     current_admin_user: usr_models.User = Depends(deps.get_current_admin_user),
 ):
     # """ID를 기준으로 분석 항목을 삭제합니다. 관리자 권한이 필요합니다."""
@@ -99,13 +99,14 @@ async def delete_parameter(
     # 물리적 삭제 대신 is_active 플래그를 업데이트합니다.
     return await lims_crud.parameter.update(db=db, db_obj=db_obj, obj_in={"is_active": False})
 
+
 # =============================================================================
 # 2. 프로젝트 (Project) 라우터
 # =============================================================================
 @router.post("/projects", response_model=lims_schemas.ProjectResponse, status_code=status.HTTP_201_CREATED, summary="새 프로젝트 생성")
 async def create_project(
     project_in: lims_schemas.ProjectCreate,
-    db: AsyncSession = Depends(deps.get_db_session_dependency),
+    db: AsyncSession = Depends(deps.get_db_session),
     current_admin_user: usr_models.User = Depends(deps.get_current_admin_user),
 ):
     return await lims_crud.project.create(db=db, obj_in=project_in)
@@ -113,14 +114,14 @@ async def create_project(
 
 @router.get("/projects", response_model=List[lims_schemas.ProjectResponse], summary="모든 프로젝트 조회")
 async def read_projects(
-    skip: int = 0, limit: int = 100, db: AsyncSession = Depends(deps.get_db_session_dependency)
+    skip: int = 0, limit: int = 100, db: AsyncSession = Depends(deps.get_db_session)
 ):
     return await lims_crud.project.get_multi(db, skip=skip, limit=limit)
 
 
 @router.get("/projects/{project_id}", response_model=lims_schemas.ProjectResponse, summary="특정 프로젝트 조회")
 async def read_project(
-    project_id: int, db: AsyncSession = Depends(deps.get_db_session_dependency)
+    project_id: int, db: AsyncSession = Depends(deps.get_db_session)
 ):
     db_obj = await lims_crud.project.get(db, id=project_id)
     if not db_obj:
@@ -132,7 +133,7 @@ async def read_project(
 async def update_project(
     project_id: int,
     project_in: lims_schemas.ProjectUpdate,
-    db: AsyncSession = Depends(deps.get_db_session_dependency),
+    db: AsyncSession = Depends(deps.get_db_session),
     current_admin_user: usr_models.User = Depends(deps.get_current_admin_user),
 ):
     db_obj = await lims_crud.project.get(db, id=project_id)
@@ -144,7 +145,7 @@ async def update_project(
 @router.delete("/projects/{project_id}", status_code=status.HTTP_204_NO_CONTENT, summary="프로젝트 삭제")
 async def delete_project(
     project_id: int,
-    db: AsyncSession = Depends(deps.get_db_session_dependency),
+    db: AsyncSession = Depends(deps.get_db_session),
     current_admin_user: usr_models.User = Depends(deps.get_current_admin_user),
 ):
     db_obj = await lims_crud.project.get(db, id=project_id)
@@ -160,7 +161,7 @@ async def delete_project(
 @router.post("/sample_containers", response_model=lims_schemas.SampleContainerResponse, status_code=status.HTTP_201_CREATED, summary="새 시료 용기 생성")
 async def create_sample_container(
     container_in: lims_schemas.SampleContainerCreate,
-    db: AsyncSession = Depends(deps.get_db_session_dependency),
+    db: AsyncSession = Depends(deps.get_db_session),
     current_admin_user: usr_models.User = Depends(deps.get_current_admin_user),
 ):
     return await lims_crud.sample_container.create(db, obj_in=container_in)
@@ -168,14 +169,14 @@ async def create_sample_container(
 
 @router.get("/sample_containers", response_model=List[lims_schemas.SampleContainerResponse], summary="모든 시료 용기 조회")
 async def read_sample_containers(
-    skip: int = 0, limit: int = 100, db: AsyncSession = Depends(deps.get_db_session_dependency)
+    skip: int = 0, limit: int = 100, db: AsyncSession = Depends(deps.get_db_session)
 ):
     return await lims_crud.sample_container.get_multi(db, skip=skip, limit=limit)
 
 
 @router.get("/sample_containers/{container_id}", response_model=lims_schemas.SampleContainerResponse, summary="특정 시료 용기 조회")
 async def read_sample_container(
-    container_id: int, db: AsyncSession = Depends(deps.get_db_session_dependency)
+    container_id: int, db: AsyncSession = Depends(deps.get_db_session)
 ):
     db_obj = await lims_crud.sample_container.get(db, id=container_id)
     if not db_obj:
@@ -187,7 +188,7 @@ async def read_sample_container(
 async def update_sample_container(
     container_id: int,
     container_in: lims_schemas.SampleContainerUpdate,
-    db: AsyncSession = Depends(deps.get_db_session_dependency),
+    db: AsyncSession = Depends(deps.get_db_session),
     current_admin_user: usr_models.User = Depends(deps.get_current_admin_user),
 ):
     db_obj = await lims_crud.sample_container.get(db, id=container_id)
@@ -199,7 +200,7 @@ async def update_sample_container(
 @router.delete("/sample_containers/{container_id}", status_code=status.HTTP_204_NO_CONTENT, summary="시료 용기 삭제")
 async def delete_sample_container(
     container_id: int,
-    db: AsyncSession = Depends(deps.get_db_session_dependency),
+    db: AsyncSession = Depends(deps.get_db_session),
     current_admin_user: usr_models.User = Depends(deps.get_current_admin_user),
 ):
     db_obj = await lims_crud.sample_container.get(db, id=container_id)
@@ -215,7 +216,7 @@ async def delete_sample_container(
 @router.post("/sample_types", response_model=lims_schemas.SampleTypeResponse, status_code=status.HTTP_201_CREATED, summary="새 시료 유형 생성")
 async def create_sample_type(
     type_in: lims_schemas.SampleTypeCreate,
-    db: AsyncSession = Depends(deps.get_db_session_dependency),
+    db: AsyncSession = Depends(deps.get_db_session),
     current_admin_user: usr_models.User = Depends(deps.get_current_admin_user),
 ):
     return await lims_crud.sample_type.create(db, obj_in=type_in)
@@ -223,14 +224,14 @@ async def create_sample_type(
 
 @router.get("/sample_types", response_model=List[lims_schemas.SampleTypeResponse], summary="모든 시료 유형 조회")
 async def read_sample_types(
-    skip: int = 0, limit: int = 100, db: AsyncSession = Depends(deps.get_db_session_dependency)
+    skip: int = 0, limit: int = 100, db: AsyncSession = Depends(deps.get_db_session)
 ):
     return await lims_crud.sample_type.get_multi(db, skip=skip, limit=limit)
 
 
 @router.get("/sample_types/{sample_type_id}", response_model=lims_schemas.SampleTypeResponse, summary="특정 시료 유형 조회")
 async def read_sample_type(
-    sample_type_id: int, db: AsyncSession = Depends(deps.get_db_session_dependency)
+    sample_type_id: int, db: AsyncSession = Depends(deps.get_db_session)
 ):
     db_obj = await lims_crud.sample_type.get(db, id=sample_type_id)
     if not db_obj:
@@ -242,7 +243,7 @@ async def read_sample_type(
 async def update_sample_type(
     sample_type_id: int,
     type_in: lims_schemas.SampleTypeUpdate,
-    db: AsyncSession = Depends(deps.get_db_session_dependency),
+    db: AsyncSession = Depends(deps.get_db_session),
     current_admin_user: usr_models.User = Depends(deps.get_current_admin_user),
 ):
     db_obj = await lims_crud.sample_type.get(db, id=sample_type_id)
@@ -254,7 +255,7 @@ async def update_sample_type(
 @router.delete("/sample_types/{sample_type_id}", status_code=status.HTTP_204_NO_CONTENT, summary="시료 유형 삭제")
 async def delete_sample_type(
     sample_type_id: int,
-    db: AsyncSession = Depends(deps.get_db_session_dependency),
+    db: AsyncSession = Depends(deps.get_db_session),
     current_admin_user: usr_models.User = Depends(deps.get_current_admin_user),
 ):
     db_obj = await lims_crud.sample_type.get(db, id=sample_type_id)
@@ -270,7 +271,7 @@ async def delete_sample_type(
 @router.post("/sampling_points", response_model=lims_schemas.SamplingPointResponse, status_code=status.HTTP_201_CREATED, summary="새 채수 지점 생성")
 async def create_sampling_point(
     point_in: lims_schemas.SamplingPointCreate,
-    db: AsyncSession = Depends(deps.get_db_session_dependency),
+    db: AsyncSession = Depends(deps.get_db_session),
     current_admin_user: usr_models.User = Depends(deps.get_current_admin_user),
 ):
     return await lims_crud.sampling_point.create(db, obj_in=point_in)
@@ -278,7 +279,7 @@ async def create_sampling_point(
 
 @router.get("/sampling_points", response_model=List[lims_schemas.SamplingPointResponse], summary="모든 채수 지점 조회")
 async def read_sampling_points(
-    facility_id: Optional[int] = None, skip: int = 0, limit: int = 100, db: AsyncSession = Depends(deps.get_db_session_dependency)
+    facility_id: Optional[int] = None, skip: int = 0, limit: int = 100, db: AsyncSession = Depends(deps.get_db_session)
 ):
     filter_kwargs = {}
     if facility_id:
@@ -288,7 +289,7 @@ async def read_sampling_points(
 
 @router.get("/sampling_points/{sampling_point_id}", response_model=lims_schemas.SamplingPointResponse, summary="특정 채수 지점 조회")
 async def read_sampling_point(
-    sampling_point_id: int, db: AsyncSession = Depends(deps.get_db_session_dependency)
+    sampling_point_id: int, db: AsyncSession = Depends(deps.get_db_session)
 ):
     db_obj = await lims_crud.sampling_point.get(db, id=sampling_point_id)
     if not db_obj:
@@ -300,7 +301,7 @@ async def read_sampling_point(
 async def update_sampling_point(
     sampling_point_id: int,
     point_in: lims_schemas.SamplingPointUpdate,
-    db: AsyncSession = Depends(deps.get_db_session_dependency),
+    db: AsyncSession = Depends(deps.get_db_session),
     current_admin_user: usr_models.User = Depends(deps.get_current_admin_user),
 ):
     db_obj = await lims_crud.sampling_point.get(db, id=sampling_point_id)
@@ -312,7 +313,7 @@ async def update_sampling_point(
 @router.delete("/sampling_points/{sampling_point_id}", status_code=status.HTTP_204_NO_CONTENT, summary="채수 지점 삭제")
 async def delete_sampling_point(
     sampling_point_id: int,
-    db: AsyncSession = Depends(deps.get_db_session_dependency),
+    db: AsyncSession = Depends(deps.get_db_session),
     current_admin_user: usr_models.User = Depends(deps.get_current_admin_user),
 ):
     db_obj = await lims_crud.sampling_point.get(db, id=sampling_point_id)
@@ -328,7 +329,7 @@ async def delete_sampling_point(
 @router.post("/weather_conditions", response_model=lims_schemas.WeatherConditionResponse, status_code=status.HTTP_201_CREATED, summary="새 날씨 조건 생성")
 async def create_weather_condition(
     weather_in: lims_schemas.WeatherConditionCreate,
-    db: AsyncSession = Depends(deps.get_db_session_dependency),
+    db: AsyncSession = Depends(deps.get_db_session),
     current_admin_user: usr_models.User = Depends(deps.get_current_admin_user),
 ):
     return await lims_crud.weather_condition.create(db, obj_in=weather_in)
@@ -336,14 +337,14 @@ async def create_weather_condition(
 
 @router.get("/weather_conditions", response_model=List[lims_schemas.WeatherConditionResponse], summary="모든 날씨 조건 조회")
 async def read_weather_conditions(
-    skip: int = 0, limit: int = 100, db: AsyncSession = Depends(deps.get_db_session_dependency)
+    skip: int = 0, limit: int = 100, db: AsyncSession = Depends(deps.get_db_session)
 ):
     return await lims_crud.weather_condition.get_multi(db, skip=skip, limit=limit)
 
 
 @router.get("/weather_conditions/{condition_id}", response_model=lims_schemas.WeatherConditionResponse, summary="특정 날씨 조건 조회")
 async def read_weather_condition(
-    condition_id: int, db: AsyncSession = Depends(deps.get_db_session_dependency)
+    condition_id: int, db: AsyncSession = Depends(deps.get_db_session)
 ):
     db_obj = await lims_crud.weather_condition.get(db, id=condition_id)
     if not db_obj:
@@ -355,7 +356,7 @@ async def read_weather_condition(
 async def update_weather_condition(
     condition_id: int,
     weather_in: lims_schemas.WeatherConditionUpdate,
-    db: AsyncSession = Depends(deps.get_db_session_dependency),
+    db: AsyncSession = Depends(deps.get_db_session),
     current_admin_user: usr_models.User = Depends(deps.get_current_admin_user),
 ):
     db_obj = await lims_crud.weather_condition.get(db, id=condition_id)
@@ -367,7 +368,7 @@ async def update_weather_condition(
 @router.delete("/weather_conditions/{condition_id}", status_code=status.HTTP_204_NO_CONTENT, summary="날씨 조건 삭제")
 async def delete_weather_condition(
     condition_id: int,
-    db: AsyncSession = Depends(deps.get_db_session_dependency),
+    db: AsyncSession = Depends(deps.get_db_session),
     current_admin_user: usr_models.User = Depends(deps.get_current_admin_user),
 ):
     db_obj = await lims_crud.weather_condition.get(db, id=condition_id)
@@ -383,7 +384,7 @@ async def delete_weather_condition(
 @router.post("/test_requests", response_model=lims_schemas.TestRequestResponse, status_code=status.HTTP_201_CREATED, summary="새 시험 의뢰 생성")
 async def create_test_request(
     request_in: lims_schemas.TestRequestCreate,
-    db: AsyncSession = Depends(deps.get_db_session_dependency),
+    db: AsyncSession = Depends(deps.get_db_session),
     current_user: usr_models.User = Depends(deps.get_current_active_user),
 ):
     return await lims_crud.test_request.create(db, obj_in=request_in, current_user_id=current_user.id)
@@ -391,7 +392,7 @@ async def create_test_request(
 
 @router.get("/test_requests", response_model=List[lims_schemas.TestRequestResponse], summary="모든 시험 의뢰 조회")
 async def read_test_requests(
-    db: AsyncSession = Depends(deps.get_db_session_dependency),
+    db: AsyncSession = Depends(deps.get_db_session),
     current_user: usr_models.User = Depends(deps.get_current_active_user),
     skip: int = 0, limit: int = 100,
 ):
@@ -403,7 +404,7 @@ async def read_test_requests(
 @router.get("/test_requests/{request_id}", response_model=lims_schemas.TestRequestResponse, summary="특정 시험 의뢰 조회")
 async def read_test_request(
     request_id: int,
-    db: AsyncSession = Depends(deps.get_db_session_dependency),
+    db: AsyncSession = Depends(deps.get_db_session),
     current_user: usr_models.User = Depends(deps.get_current_active_user),
 ):
     db_obj = await lims_crud.test_request.get(db, id=request_id)
@@ -418,7 +419,7 @@ async def read_test_request(
 async def update_test_request(
     request_id: int,
     request_in: lims_schemas.TestRequestUpdate,
-    db: AsyncSession = Depends(deps.get_db_session_dependency),
+    db: AsyncSession = Depends(deps.get_db_session),
     current_user: usr_models.User = Depends(deps.get_current_active_user),
 ):
     db_obj = await lims_crud.test_request.get(db, id=request_id)
@@ -432,7 +433,7 @@ async def update_test_request(
 @router.delete("/test_requests/{request_id}", status_code=status.HTTP_204_NO_CONTENT, summary="시험 의뢰 삭제")
 async def delete_test_request(
     request_id: int,
-    db: AsyncSession = Depends(deps.get_db_session_dependency),
+    db: AsyncSession = Depends(deps.get_db_session),
     current_admin_user: usr_models.User = Depends(deps.get_current_admin_user),
 ):
     db_obj = await lims_crud.test_request.get(db, id=request_id)
@@ -448,7 +449,7 @@ async def delete_test_request(
 @router.post("/samples", response_model=lims_schemas.SampleResponse, status_code=status.HTTP_201_CREATED, summary="새 원 시료 생성")
 async def create_sample(
     sample_in: lims_schemas.SampleCreate,
-    db: AsyncSession = Depends(deps.get_db_session_dependency),
+    db: AsyncSession = Depends(deps.get_db_session),
     current_user: usr_models.User = Depends(deps.get_current_active_user),
 ):
     return await lims_crud.sample.create(db=db, obj_in=sample_in)
@@ -456,7 +457,7 @@ async def create_sample(
 
 @router.get("/samples", response_model=List[lims_schemas.SampleResponse], summary="모든 원 시료 조회")
 async def read_samples(
-    db: AsyncSession = Depends(deps.get_db_session_dependency),
+    db: AsyncSession = Depends(deps.get_db_session),
     current_user: usr_models.User = Depends(deps.get_current_active_user),
     skip: int = 0, limit: int = 100,
 ):
@@ -468,7 +469,7 @@ async def read_samples(
 @router.get("/samples/{sample_id}", response_model=lims_schemas.SampleResponse, summary="특정 원 시료 조회")
 async def read_sample(
     sample_id: int,
-    db: AsyncSession = Depends(deps.get_db_session_dependency),
+    db: AsyncSession = Depends(deps.get_db_session),
     current_user: usr_models.User = Depends(deps.get_current_active_user),
 ):
     db_obj = await lims_crud.sample.get(db, id=sample_id)
@@ -483,7 +484,7 @@ async def read_sample(
 async def update_sample(
     sample_id: int,
     sample_in: lims_schemas.SampleUpdate,
-    db: AsyncSession = Depends(deps.get_db_session_dependency),
+    db: AsyncSession = Depends(deps.get_db_session),
     current_admin_user: usr_models.User = Depends(deps.get_current_admin_user),
 ):
     db_obj = await lims_crud.sample.get(db, id=sample_id)
@@ -495,7 +496,7 @@ async def update_sample(
 @router.delete("/samples/{sample_id}", status_code=status.HTTP_204_NO_CONTENT, summary="원 시료 삭제")
 async def delete_sample(
     sample_id: int,
-    db: AsyncSession = Depends(deps.get_db_session_dependency),
+    db: AsyncSession = Depends(deps.get_db_session),
     current_admin_user: usr_models.User = Depends(deps.get_current_admin_user),
 ):
     db_obj = await lims_crud.sample.get(db, id=sample_id)
@@ -511,7 +512,7 @@ async def delete_sample(
 @router.post("/aliquot_samples", response_model=lims_schemas.AliquotSampleResponse, status_code=status.HTTP_201_CREATED, summary="새 분할 시료 생성")
 async def create_aliquot_sample(
     aliquot_in: lims_schemas.AliquotSampleCreate,
-    db: AsyncSession = Depends(deps.get_db_session_dependency),
+    db: AsyncSession = Depends(deps.get_db_session),
     current_user: usr_models.User = Depends(deps.get_current_active_user),
 ):
     if not aliquot_in.analyst_user_id:
@@ -521,7 +522,7 @@ async def create_aliquot_sample(
 
 @router.get("/aliquot_samples", response_model=List[lims_schemas.AliquotSampleResponse], summary="모든 분할 시료 조회")
 async def read_aliquot_samples(
-    db: AsyncSession = Depends(deps.get_db_session_dependency),
+    db: AsyncSession = Depends(deps.get_db_session),
     current_user: usr_models.User = Depends(deps.get_current_active_user),
     skip: int = 0, limit: int = 100,
 ):
@@ -533,7 +534,7 @@ async def read_aliquot_samples(
 @router.get("/aliquot_samples/{aliquot_sample_id}", response_model=lims_schemas.AliquotSampleResponse, summary="특정 분할 시료 조회")
 async def read_aliquot_sample(
     aliquot_sample_id: int,
-    db: AsyncSession = Depends(deps.get_db_session_dependency),
+    db: AsyncSession = Depends(deps.get_db_session),
     current_user: usr_models.User = Depends(deps.get_current_active_user),
 ):
     db_obj = await lims_crud.aliquot_sample.get(db, id=aliquot_sample_id)
@@ -548,7 +549,7 @@ async def read_aliquot_sample(
 async def update_aliquot_sample(
     aliquot_sample_id: int,
     aliquot_in: lims_schemas.AliquotSampleUpdate,
-    db: AsyncSession = Depends(deps.get_db_session_dependency),
+    db: AsyncSession = Depends(deps.get_db_session),
     current_admin_user: usr_models.User = Depends(deps.get_current_admin_user),
 ):
     db_obj = await lims_crud.aliquot_sample.get(db, id=aliquot_sample_id)
@@ -560,7 +561,7 @@ async def update_aliquot_sample(
 @router.delete("/aliquot_samples/{aliquot_sample_id}", status_code=status.HTTP_204_NO_CONTENT, summary="분할 시료 삭제")
 async def delete_aliquot_sample(
     aliquot_sample_id: int,
-    db: AsyncSession = Depends(deps.get_db_session_dependency),
+    db: AsyncSession = Depends(deps.get_db_session),
     current_admin_user: usr_models.User = Depends(deps.get_current_admin_user),
 ):
     db_obj = await lims_crud.aliquot_sample.get(db, id=aliquot_sample_id)
@@ -576,7 +577,7 @@ async def delete_aliquot_sample(
 @router.post("/worksheets", response_model=lims_schemas.WorksheetResponse, status_code=status.HTTP_201_CREATED, summary="새 워크시트 생성")
 async def create_worksheet(
     worksheet_in: lims_schemas.WorksheetCreate,
-    db: AsyncSession = Depends(deps.get_db_session_dependency),
+    db: AsyncSession = Depends(deps.get_db_session),
     current_admin_user: usr_models.User = Depends(deps.get_current_admin_user),
 ):
     return await lims_crud.worksheet.create(db=db, obj_in=worksheet_in)
@@ -584,14 +585,14 @@ async def create_worksheet(
 
 @router.get("/worksheets", response_model=List[lims_schemas.WorksheetResponse], summary="모든 워크시트 조회")
 async def read_worksheets(
-    skip: int = 0, limit: int = 100, db: AsyncSession = Depends(deps.get_db_session_dependency)
+    skip: int = 0, limit: int = 100, db: AsyncSession = Depends(deps.get_db_session)
 ):
     return await lims_crud.worksheet.get_multi(db, skip=skip, limit=limit)
 
 
 @router.get("/worksheets/{worksheet_id}", response_model=lims_schemas.WorksheetResponse, summary="특정 워크시트 조회")
 async def read_worksheet(
-    worksheet_id: int, db: AsyncSession = Depends(deps.get_db_session_dependency)
+    worksheet_id: int, db: AsyncSession = Depends(deps.get_db_session)
 ):
     db_obj = await lims_crud.worksheet.get(db, id=worksheet_id)
     if not db_obj:
@@ -603,7 +604,7 @@ async def read_worksheet(
 async def update_worksheet(
     worksheet_id: int,
     worksheet_in: lims_schemas.WorksheetUpdate,
-    db: AsyncSession = Depends(deps.get_db_session_dependency),
+    db: AsyncSession = Depends(deps.get_db_session),
     current_admin_user: usr_models.User = Depends(deps.get_current_admin_user),
 ):
     db_obj = await lims_crud.worksheet.get(db, id=worksheet_id)
@@ -615,7 +616,7 @@ async def update_worksheet(
 @router.delete("/worksheets/{worksheet_id}", status_code=status.HTTP_204_NO_CONTENT, summary="워크시트 삭제")
 async def delete_worksheet(
     worksheet_id: int,
-    db: AsyncSession = Depends(deps.get_db_session_dependency),
+    db: AsyncSession = Depends(deps.get_db_session),
     current_admin_user: usr_models.User = Depends(deps.get_current_admin_user),
 ):
     db_obj = await lims_crud.worksheet.get(db, id=worksheet_id)
@@ -632,7 +633,7 @@ async def delete_worksheet(
 async def create_worksheet_item(
     request: Request,
     worksheet_item_in: lims_schemas.WorksheetItemCreate,
-    db: AsyncSession = Depends(deps.get_db_session_dependency),
+    db: AsyncSession = Depends(deps.get_db_session),
     current_admin_user: usr_models.User = Depends(deps.get_current_admin_user),
 ):
     created_item = await lims_crud.worksheet_item.create(db=db, obj_in=worksheet_item_in)
@@ -659,7 +660,7 @@ async def create_worksheet_item(
 @router.get("/worksheets/{worksheet_id}/items", response_model=List[lims_schemas.WorksheetItemResponse], summary="특정 워크시트의 모든 항목 조회")
 async def read_worksheet_items_for_worksheet(
     worksheet_id: int,
-    db: AsyncSession = Depends(deps.get_db_session_dependency),
+    db: AsyncSession = Depends(deps.get_db_session),
 ):
     """
     특정 워크시트 ID에 해당하는 모든 항목을 데이터베이스에서 직접 필터링하여 조회합니다.
@@ -672,7 +673,7 @@ async def read_worksheet_items_for_worksheet(
 
 @router.get("/worksheet_items/{item_id}", response_model=lims_schemas.WorksheetItemResponse, summary="특정 워크시트 항목 조회")
 async def read_worksheet_item(
-    item_id: int, db: AsyncSession = Depends(deps.get_db_session_dependency)
+    item_id: int, db: AsyncSession = Depends(deps.get_db_session)
 ):
     db_obj = await lims_crud.worksheet_item.get(db, id=item_id)
     if not db_obj:
@@ -685,7 +686,7 @@ async def update_worksheet_item(
     request: Request,
     item_id: int,
     worksheet_item_update: lims_schemas.WorksheetItemUpdate,
-    db: AsyncSession = Depends(deps.get_db_session_dependency),
+    db: AsyncSession = Depends(deps.get_db_session),
     current_admin_user: usr_models.User = Depends(deps.get_current_admin_user),
 ):
     db_item = await lims_crud.worksheet_item.get(db, id=item_id)
@@ -720,7 +721,7 @@ async def update_worksheet_item(
 @router.delete("/worksheet_items/{item_id}", response_model=lims_schemas.WorksheetItemResponse, summary="워크시트 항목 비활성화 (Soft Delete)")
 async def delete_worksheet_item(
     item_id: int,
-    db: AsyncSession = Depends(deps.get_db_session_dependency),
+    db: AsyncSession = Depends(deps.get_db_session),
     current_admin_user: usr_models.User = Depends(deps.get_current_admin_user),
 ):
     """
@@ -742,7 +743,7 @@ async def delete_worksheet_item(
 @router.post("/worksheet_data", response_model=lims_schemas.WorksheetDataResponse, status_code=status.HTTP_201_CREATED, summary="새 워크시트 데이터 생성")
 async def create_worksheet_data(
     data_in: lims_schemas.WorksheetDataCreate,
-    db: AsyncSession = Depends(deps.get_db_session_dependency),
+    db: AsyncSession = Depends(deps.get_db_session),
     current_user: usr_models.User = Depends(deps.get_current_active_user),
 ):
     if not data_in.analyst_user_id:
@@ -752,14 +753,14 @@ async def create_worksheet_data(
 
 @router.get("/worksheet_data", response_model=List[lims_schemas.WorksheetDataResponse], summary="모든 워크시트 데이터 조회")
 async def read_worksheet_data(
-    skip: int = 0, limit: int = 100, db: AsyncSession = Depends(deps.get_db_session_dependency)
+    skip: int = 0, limit: int = 100, db: AsyncSession = Depends(deps.get_db_session)
 ):
     return await lims_crud.worksheet_data.get_multi(db, skip=skip, limit=limit)
 
 
 @router.get("/worksheet_data/{data_id}", response_model=lims_schemas.WorksheetDataResponse, summary="특정 워크시트 데이터 조회")
 async def read_worksheet_data_by_id(
-    data_id: int, db: AsyncSession = Depends(deps.get_db_session_dependency)
+    data_id: int, db: AsyncSession = Depends(deps.get_db_session)
 ):
     db_obj = await lims_crud.worksheet_data.get(db, id=data_id)
     if not db_obj:
@@ -771,7 +772,7 @@ async def read_worksheet_data_by_id(
 async def update_worksheet_data(
     data_id: int,
     data_in: lims_schemas.WorksheetDataUpdate,
-    db: AsyncSession = Depends(deps.get_db_session_dependency),
+    db: AsyncSession = Depends(deps.get_db_session),
     current_admin_user: usr_models.User = Depends(deps.get_current_admin_user),
 ):
     db_obj = await lims_crud.worksheet_data.get(db, id=data_id)
@@ -783,7 +784,7 @@ async def update_worksheet_data(
 @router.delete("/worksheet_data/{data_id}", status_code=status.HTTP_204_NO_CONTENT, summary="워크시트 데이터 삭제")
 async def delete_worksheet_data(
     data_id: int,
-    db: AsyncSession = Depends(deps.get_db_session_dependency),
+    db: AsyncSession = Depends(deps.get_db_session),
     current_admin_user: usr_models.User = Depends(deps.get_current_admin_user),
 ):
     db_obj = await lims_crud.worksheet_data.get(db, id=data_id)
@@ -799,7 +800,7 @@ async def delete_worksheet_data(
 @router.post("/analysis_results", response_model=lims_schemas.AnalysisResultResponse, status_code=status.HTTP_201_CREATED, summary="새 분석 결과 생성")
 async def create_analysis_result(
     result_in: lims_schemas.AnalysisResultCreate,
-    db: AsyncSession = Depends(deps.get_db_session_dependency),
+    db: AsyncSession = Depends(deps.get_db_session),
     current_user: usr_models.User = Depends(deps.get_current_active_user),
 ):
     if not result_in.analyst_user_id:
@@ -809,14 +810,14 @@ async def create_analysis_result(
 
 @router.get("/analysis_results", response_model=List[lims_schemas.AnalysisResultResponse], summary="모든 분석 결과 조회")
 async def read_analysis_results(
-    skip: int = 0, limit: int = 100, db: AsyncSession = Depends(deps.get_db_session_dependency)
+    skip: int = 0, limit: int = 100, db: AsyncSession = Depends(deps.get_db_session)
 ):
     return await lims_crud.analysis_result.get_multi(db, skip=skip, limit=limit)
 
 
 @router.get("/analysis_results/{result_id}", response_model=lims_schemas.AnalysisResultResponse, summary="특정 분석 결과 조회")
 async def read_analysis_result(
-    result_id: int, db: AsyncSession = Depends(deps.get_db_session_dependency)
+    result_id: int, db: AsyncSession = Depends(deps.get_db_session)
 ):
     db_obj = await lims_crud.analysis_result.get(db, id=result_id)
     if not db_obj:
@@ -828,7 +829,7 @@ async def read_analysis_result(
 async def update_analysis_result(
     result_id: int,
     result_in: lims_schemas.AnalysisResultUpdate,
-    db: AsyncSession = Depends(deps.get_db_session_dependency),
+    db: AsyncSession = Depends(deps.get_db_session),
     current_admin_user: usr_models.User = Depends(deps.get_current_admin_user),
 ):
     db_obj = await lims_crud.analysis_result.get(db, id=result_id)
@@ -840,7 +841,7 @@ async def update_analysis_result(
 @router.delete("/analysis_results/{result_id}", status_code=status.HTTP_204_NO_CONTENT, summary="분석 결과 삭제")
 async def delete_analysis_result(
     result_id: int,
-    db: AsyncSession = Depends(deps.get_db_session_dependency),
+    db: AsyncSession = Depends(deps.get_db_session),
     current_admin_user: usr_models.User = Depends(deps.get_current_admin_user),
 ):
     db_obj = await lims_crud.analysis_result.get(db, id=result_id)
@@ -856,7 +857,7 @@ async def delete_analysis_result(
 @router.post("/test_request_templates", response_model=lims_schemas.TestRequestTemplateResponse, status_code=status.HTTP_201_CREATED, summary="새 시험 의뢰 템플릿 생성")
 async def create_test_request_template(
     template_in: lims_schemas.TestRequestTemplateCreate,
-    db: AsyncSession = Depends(deps.get_db_session_dependency),
+    db: AsyncSession = Depends(deps.get_db_session),
     current_user: usr_models.User = Depends(deps.get_current_active_user),
 ):
     return await lims_crud.test_request_template.create(db, obj_in=template_in, current_user_id=current_user.id)
@@ -864,7 +865,7 @@ async def create_test_request_template(
 
 @router.get("/test_request_templates", response_model=List[lims_schemas.TestRequestTemplateResponse], summary="사용자의 모든 시험 의뢰 템플릿 조회")
 async def read_test_request_templates(
-    db: AsyncSession = Depends(deps.get_db_session_dependency),
+    db: AsyncSession = Depends(deps.get_db_session),
     current_user: usr_models.User = Depends(deps.get_current_active_user),
     skip: int = 0, limit: int = 100,
 ):
@@ -876,7 +877,7 @@ async def read_test_request_templates(
 @router.get("/test_request_templates/{template_id}", response_model=lims_schemas.TestRequestTemplateResponse, summary="특정 시험 의뢰 템플릿 조회")
 async def read_test_request_template(
     template_id: int,
-    db: AsyncSession = Depends(deps.get_db_session_dependency),
+    db: AsyncSession = Depends(deps.get_db_session),
     current_user: usr_models.User = Depends(deps.get_current_active_user),
 ):
     db_obj = await lims_crud.test_request_template.get(db, id=template_id)
@@ -891,7 +892,7 @@ async def read_test_request_template(
 async def update_test_request_template(
     template_id: int,
     template_in: lims_schemas.TestRequestTemplateUpdate,
-    db: AsyncSession = Depends(deps.get_db_session_dependency),
+    db: AsyncSession = Depends(deps.get_db_session),
     current_user: usr_models.User = Depends(deps.get_current_active_user),
 ):
     db_obj = await lims_crud.test_request_template.get(db, id=template_id)
@@ -905,7 +906,7 @@ async def update_test_request_template(
 @router.delete("/test_request_templates/{template_id}", status_code=status.HTTP_204_NO_CONTENT, summary="시험 의뢰 템플릿 삭제")
 async def delete_test_request_template(
     template_id: int,
-    db: AsyncSession = Depends(deps.get_db_session_dependency),
+    db: AsyncSession = Depends(deps.get_db_session),
     current_user: usr_models.User = Depends(deps.get_current_active_user),
 ):
     db_obj = await lims_crud.test_request_template.get(db, id=template_id)
@@ -923,7 +924,7 @@ async def delete_test_request_template(
 @router.post("/standard_samples", response_model=lims_schemas.StandardSampleResponse, status_code=status.HTTP_201_CREATED, summary="새 표준 시료 생성")
 async def create_standard_sample(
     sample_in: lims_schemas.StandardSampleCreate,
-    db: AsyncSession = Depends(deps.get_db_session_dependency),
+    db: AsyncSession = Depends(deps.get_db_session),
     current_admin_user: usr_models.User = Depends(deps.get_current_admin_user),
 ):
     return await lims_crud.standard_sample.create(db, obj_in=sample_in)
@@ -931,14 +932,14 @@ async def create_standard_sample(
 
 @router.get("/standard_samples", response_model=List[lims_schemas.StandardSampleResponse], summary="모든 표준 시료 조회")
 async def read_standard_samples(
-    skip: int = 0, limit: int = 100, db: AsyncSession = Depends(deps.get_db_session_dependency)
+    skip: int = 0, limit: int = 100, db: AsyncSession = Depends(deps.get_db_session)
 ):
     return await lims_crud.standard_sample.get_multi(db, skip=skip, limit=limit)
 
 
 @router.get("/standard_samples/{sample_id}", response_model=lims_schemas.StandardSampleResponse, summary="특정 표준 시료 조회")
 async def read_standard_sample(
-    sample_id: int, db: AsyncSession = Depends(deps.get_db_session_dependency)
+    sample_id: int, db: AsyncSession = Depends(deps.get_db_session)
 ):
     db_obj = await lims_crud.standard_sample.get(db, id=sample_id)
     if not db_obj:
@@ -950,7 +951,7 @@ async def read_standard_sample(
 async def update_standard_sample(
     sample_id: int,
     sample_in: lims_schemas.StandardSampleUpdate,
-    db: AsyncSession = Depends(deps.get_db_session_dependency),
+    db: AsyncSession = Depends(deps.get_db_session),
     current_admin_user: usr_models.User = Depends(deps.get_current_admin_user),
 ):
     db_obj = await lims_crud.standard_sample.get(db, id=sample_id)
@@ -962,7 +963,7 @@ async def update_standard_sample(
 @router.delete("/standard_samples/{sample_id}", status_code=status.HTTP_204_NO_CONTENT, summary="표준 시료 삭제")
 async def delete_standard_sample(
     sample_id: int,
-    db: AsyncSession = Depends(deps.get_db_session_dependency),
+    db: AsyncSession = Depends(deps.get_db_session),
     current_admin_user: usr_models.User = Depends(deps.get_current_admin_user),
 ):
     db_obj = await lims_crud.standard_sample.get(db, id=sample_id)
@@ -978,7 +979,7 @@ async def delete_standard_sample(
 @router.post("/calibration_records", response_model=lims_schemas.CalibrationRecordResponse, status_code=status.HTTP_201_CREATED, summary="새 교정 기록 생성")
 async def create_calibration_record(
     record_in: lims_schemas.CalibrationRecordCreate,
-    db: AsyncSession = Depends(deps.get_db_session_dependency),
+    db: AsyncSession = Depends(deps.get_db_session),
     current_user: usr_models.User = Depends(deps.get_current_active_user),
 ):
     if not record_in.calibrated_by_user_id:
@@ -988,14 +989,14 @@ async def create_calibration_record(
 
 @router.get("/calibration_records", response_model=List[lims_schemas.CalibrationRecordResponse], summary="모든 교정 기록 조회")
 async def read_calibration_records(
-    skip: int = 0, limit: int = 100, db: AsyncSession = Depends(deps.get_db_session_dependency)
+    skip: int = 0, limit: int = 100, db: AsyncSession = Depends(deps.get_db_session)
 ):
     return await lims_crud.calibration_record.get_multi(db, skip=skip, limit=limit)
 
 
 @router.get("/calibration_records/{record_id}", response_model=lims_schemas.CalibrationRecordResponse, summary="특정 교정 기록 조회")
 async def read_calibration_record(
-    record_id: int, db: AsyncSession = Depends(deps.get_db_session_dependency)
+    record_id: int, db: AsyncSession = Depends(deps.get_db_session)
 ):
     db_obj = await lims_crud.calibration_record.get(db, id=record_id)
     if not db_obj:
@@ -1007,7 +1008,7 @@ async def read_calibration_record(
 async def update_calibration_record(
     record_id: int,
     record_in: lims_schemas.CalibrationRecordUpdate,
-    db: AsyncSession = Depends(deps.get_db_session_dependency),
+    db: AsyncSession = Depends(deps.get_db_session),
     current_admin_user: usr_models.User = Depends(deps.get_current_admin_user),
 ):
     db_obj = await lims_crud.calibration_record.get(db, id=record_id)
@@ -1019,7 +1020,7 @@ async def update_calibration_record(
 @router.delete("/calibration_records/{record_id}", status_code=status.HTTP_204_NO_CONTENT, summary="교정 기록 삭제")
 async def delete_calibration_record(
     record_id: int,
-    db: AsyncSession = Depends(deps.get_db_session_dependency),
+    db: AsyncSession = Depends(deps.get_db_session),
     current_admin_user: usr_models.User = Depends(deps.get_current_admin_user),
 ):
     db_obj = await lims_crud.calibration_record.get(db, id=record_id)
@@ -1035,7 +1036,7 @@ async def delete_calibration_record(
 @router.post("/qc_sample_results", response_model=lims_schemas.QcSampleResultResponse, status_code=status.HTTP_201_CREATED, summary="새 QC 시료 결과 생성")
 async def create_qc_sample_result(
     result_in: lims_schemas.QcSampleResultCreate,
-    db: AsyncSession = Depends(deps.get_db_session_dependency),
+    db: AsyncSession = Depends(deps.get_db_session),
     current_user: usr_models.User = Depends(deps.get_current_active_user),
 ):
     if not result_in.analyst_user_id:
@@ -1045,14 +1046,14 @@ async def create_qc_sample_result(
 
 @router.get("/qc_sample_results", response_model=List[lims_schemas.QcSampleResultResponse], summary="모든 QC 시료 결과 조회")
 async def read_qc_sample_results(
-    skip: int = 0, limit: int = 100, db: AsyncSession = Depends(deps.get_db_session_dependency)
+    skip: int = 0, limit: int = 100, db: AsyncSession = Depends(deps.get_db_session)
 ):
     return await lims_crud.qc_sample_result.get_multi(db, skip=skip, limit=limit)
 
 
 @router.get("/qc_sample_results/{result_id}", response_model=lims_schemas.QcSampleResultResponse, summary="특정 QC 시료 결과 조회")
 async def read_qc_sample_result(
-    result_id: int, db: AsyncSession = Depends(deps.get_db_session_dependency)
+    result_id: int, db: AsyncSession = Depends(deps.get_db_session)
 ):
     db_obj = await lims_crud.qc_sample_result.get(db, id=result_id)
     if not db_obj:
@@ -1064,7 +1065,7 @@ async def read_qc_sample_result(
 async def update_qc_sample_result(
     result_id: int,
     result_in: lims_schemas.QcSampleResultUpdate,
-    db: AsyncSession = Depends(deps.get_db_session_dependency),
+    db: AsyncSession = Depends(deps.get_db_session),
     current_admin_user: usr_models.User = Depends(deps.get_current_admin_user),
 ):
     db_obj = await lims_crud.qc_sample_result.get(db, id=result_id)
@@ -1076,7 +1077,7 @@ async def update_qc_sample_result(
 @router.delete("/qc_sample_results/{result_id}", status_code=status.HTTP_204_NO_CONTENT, summary="QC 시료 결과 삭제")
 async def delete_qc_sample_result(
     result_id: int,
-    db: AsyncSession = Depends(deps.get_db_session_dependency),
+    db: AsyncSession = Depends(deps.get_db_session),
     current_admin_user: usr_models.User = Depends(deps.get_current_admin_user),
 ):
     db_obj = await lims_crud.qc_sample_result.get(db, id=result_id)
@@ -1092,7 +1093,7 @@ async def delete_qc_sample_result(
 @router.post("/pr_views", response_model=lims_schemas.PrViewResponse, status_code=status.HTTP_201_CREATED, summary="새 사용자 정의 보기 생성")
 async def create_pr_view(
     view_in: lims_schemas.PrViewCreate,
-    db: AsyncSession = Depends(deps.get_db_session_dependency),
+    db: AsyncSession = Depends(deps.get_db_session),
     current_user: usr_models.User = Depends(deps.get_current_active_user),
 ):
     return await lims_crud.pr_view.create(db, obj_in=view_in, current_user_id=current_user.id)
@@ -1100,7 +1101,7 @@ async def create_pr_view(
 
 @router.get("/pr_views", response_model=List[lims_schemas.PrViewResponse], summary="사용자의 모든 정의 보기 조회")
 async def read_pr_views(
-    db: AsyncSession = Depends(deps.get_db_session_dependency),
+    db: AsyncSession = Depends(deps.get_db_session),
     current_user: usr_models.User = Depends(deps.get_current_active_user),
     skip: int = 0, limit: int = 100,
 ):
@@ -1112,7 +1113,7 @@ async def read_pr_views(
 @router.get("/pr_views/{pr_view_id}", response_model=lims_schemas.PrViewResponse, summary="특정 사용자 정의 보기 조회")
 async def read_pr_view(
     pr_view_id: int,
-    db: AsyncSession = Depends(deps.get_db_session_dependency),
+    db: AsyncSession = Depends(deps.get_db_session),
     current_user: usr_models.User = Depends(deps.get_current_active_user),
 ):
     db_obj = await lims_crud.pr_view.get(db, id=pr_view_id)
@@ -1127,7 +1128,7 @@ async def read_pr_view(
 async def update_pr_view(
     pr_view_id: int,
     view_in: lims_schemas.PrViewUpdate,
-    db: AsyncSession = Depends(deps.get_db_session_dependency),
+    db: AsyncSession = Depends(deps.get_db_session),
     current_user: usr_models.User = Depends(deps.get_current_active_user),
 ):
     db_obj = await lims_crud.pr_view.get(db, id=pr_view_id)
@@ -1141,7 +1142,7 @@ async def update_pr_view(
 @router.delete("/pr_views/{pr_view_id}", status_code=status.HTTP_204_NO_CONTENT, summary="사용자 정의 보기 삭제")
 async def delete_pr_view(
     pr_view_id: int,
-    db: AsyncSession = Depends(deps.get_db_session_dependency),
+    db: AsyncSession = Depends(deps.get_db_session),
     current_user: usr_models.User = Depends(deps.get_current_active_user),
 ):
     db_obj = await lims_crud.pr_view.get(db, id=pr_view_id)

@@ -5,7 +5,7 @@
 권한 확인 로직이 올바르게 수정되었습니다.
 """
 
-from typing import List, Optional
+from typing import List  # , Optional
 from datetime import timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
@@ -15,12 +15,8 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 # 애플리케이션 설정 및 의존성 임포트
 from app.core.config import settings
 from app.core.database import get_session
-from app.core.security import (
-    create_access_token,
-    get_current_active_user,
-    get_current_admin_user,
-    get_current_superuser,
-)
+from app.core import dependencies as deps
+
 # usr 도메인의 CRUD, 모델, 스키마
 from . import crud as usr_crud
 from . import models as usr_models
@@ -56,12 +52,12 @@ async def login_for_access_token(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Inactive user")
 
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = create_access_token(data={"sub": user.username}, expires_delta=access_token_expires)
+    access_token = deps.create_access_token(data={"sub": user.username}, expires_delta=access_token_expires)
     return {"access_token": access_token, "token_type": "bearer"}
 
 
 @router.get("/auth/me", response_model=usr_schemas.UserRead, summary="현재 사용자 정보 조회")
-async def read_users_me(current_user: usr_models.User = Depends(get_current_active_user)):
+async def read_users_me(current_user: usr_models.User = Depends(deps.get_current_active_user)):
     return current_user
 
 
@@ -73,7 +69,7 @@ async def read_users_me(current_user: usr_models.User = Depends(get_current_acti
 async def create_department(
     department: usr_schemas.DepartmentCreate,
     db: AsyncSession = Depends(get_session),
-    current_admin_user: usr_models.User = Depends(get_current_admin_user),
+    current_admin_user: usr_models.User = Depends(deps.get_current_admin_user),
 ):
     return await usr_crud.department.create(db, obj_in=department)
 
@@ -91,7 +87,7 @@ async def read_departments(
 async def read_department(
     department_id: int,
     db: AsyncSession = Depends(get_session),
-    current_user: usr_models.User = Depends(get_current_active_user),  # 모든 활성 사용자가 조회 가능하도록 가정 (필요시 admin_user로 변경)
+    current_user: usr_models.User = Depends(deps.get_current_active_user),  # 모든 활성 사용자가 조회 가능하도록 가정 (필요시 admin_user로 변경)
 ):
     department = await usr_crud.department.get(db, id=department_id)
     if not department:
@@ -104,7 +100,7 @@ async def update_department(
     department_id: int,
     department_in: usr_schemas.DepartmentUpdate,
     db: AsyncSession = Depends(get_session),
-    current_admin_user: usr_models.User = Depends(get_current_admin_user),  # 관리자 권한 필요
+    current_admin_user: usr_models.User = Depends(deps.get_current_admin_user),  # 관리자 권한 필요
 ):
     db_department = await usr_crud.department.get(db, id=department_id)
     if not db_department:
@@ -136,7 +132,7 @@ async def update_department(
 async def delete_department(
     department_id: int,
     db: AsyncSession = Depends(get_session),
-    current_admin_user: usr_models.User = Depends(get_current_admin_user),  # 관리자 권한 필요
+    current_admin_user: usr_models.User = Depends(deps.get_current_admin_user),  # 관리자 권한 필요
 ):
     department = await usr_crud.department.get(db, id=department_id)
     if not department:
@@ -153,7 +149,7 @@ async def delete_department(
 async def create_user(
     user: usr_schemas.UserCreate,
     db: AsyncSession = Depends(get_session),
-    current_admin_user: usr_models.User = Depends(get_current_admin_user),
+    current_admin_user: usr_models.User = Depends(deps.get_current_admin_user),
 ):
     return await usr_crud.user.create(db, obj_in=user)
 
@@ -163,7 +159,7 @@ async def read_users(
     db: AsyncSession = Depends(get_session),
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1),
-    current_user: usr_models.User = Depends(get_current_active_user),
+    current_user: usr_models.User = Depends(deps.get_current_active_user),
 ):
     """
     모든 사용자 목록을 조회합니다.
@@ -182,7 +178,7 @@ async def read_users(
 async def read_user(
     user_id: int,
     db: AsyncSession = Depends(get_session),
-    current_user: usr_models.User = Depends(get_current_active_user),
+    current_user: usr_models.User = Depends(deps.get_current_active_user),
 ):
     """
     ID로 특정 사용자 정보를 조회합니다.
@@ -207,7 +203,7 @@ async def update_user(
     user_id: int,
     user_in: usr_schemas.UserUpdate,
     db: AsyncSession = Depends(get_session),
-    current_user: usr_models.User = Depends(get_current_active_user),
+    current_user: usr_models.User = Depends(deps.get_current_active_user),
 ):
     """
     ID로 사용자 정보를 업데이트합니다.
@@ -237,7 +233,7 @@ async def update_user(
 async def delete_user(
     user_id: int,
     db: AsyncSession = Depends(get_session),
-    current_superuser: usr_models.User = Depends(get_current_superuser),
+    current_superuser: usr_models.User = Depends(deps.get_current_superuser),
 ):
     """
     ID로 사용자를 삭제합니다. 최고 관리자(Superuser) 권한이 필요합니다.

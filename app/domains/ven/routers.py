@@ -11,12 +11,14 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlalchemy.orm import selectinload
 
 # 공통 의존성 및 ven 도메인의 구성요소 임포트
-from app.core.database import get_session
+# 핵심 의존성 (데이터베이스 세션, 사용자 인증 등)
+from app.core import dependencies as deps
+
+from app.domains.usr.models import User
+
 from . import crud as ven_crud
 from . import schemas as ven_schemas
 from . import models as ven_models
-from app.domains.usr.models import User
-from app.core.security import get_current_admin_user  # 관리자 권한 예시
 
 # APIRouter 인스턴스 생성
 router = APIRouter(
@@ -38,8 +40,8 @@ router = APIRouter(
 )
 async def create_vendor_category(
     category_in: ven_schemas.VendorCategoryCreate,
-    db: AsyncSession = Depends(get_session),
-    current_user: User = Depends(get_current_admin_user),  # 필요 시 관리자 권한 추가
+    db: AsyncSession = Depends(deps.get_db_session),
+    current_user: User = Depends(deps.get_current_admin_user),  # 필요 시 관리자 권한 추가
 ):
     """
     새로운 공급업체 카테고리를 생성합니다.
@@ -63,7 +65,7 @@ async def create_vendor_category(
     summary="모든 공급업체 카테고리 조회",
 )
 async def read_vendor_categories(
-    db: AsyncSession = Depends(get_session), skip: int = 0, limit: int = 100
+    db: AsyncSession = Depends(deps.get_db_session), skip: int = 0, limit: int = 100
 ):
     """
     모든 공급업체 카테고리 목록을 조회합니다.
@@ -82,7 +84,7 @@ async def read_vendor_categories(
     summary="특정 공급업체 카테고리 정보 조회",
 )
 async def read_vendor_category(
-    category_id: int, db: AsyncSession = Depends(get_session)
+    category_id: int, db: AsyncSession = Depends(deps.get_db_session)
 ):
     """
     특정 ID의 공급업체 카테고리 정보를 조회합니다.
@@ -101,8 +103,8 @@ async def read_vendor_category(
 async def update_vendor_category(
     category_id: int,
     category_in: ven_schemas.VendorCategoryUpdate,
-    db: AsyncSession = Depends(get_session),
-    current_user: User = Depends(get_current_admin_user),
+    db: AsyncSession = Depends(deps.get_db_session),
+    current_user: User = Depends(deps.get_current_admin_user),
 ):
     """
     ID로 특정 공급업체 카테고리의 정보를 수정합니다.
@@ -122,8 +124,8 @@ async def update_vendor_category(
 )
 async def delete_vendor_category(
     category_id: int,
-    db: AsyncSession = Depends(get_session),
-    current_user: User = Depends(get_current_admin_user),
+    db: AsyncSession = Depends(deps.get_db_session),
+    current_user: User = Depends(deps.get_current_admin_user),
 ):
     """
     ID로 특정 공급업체 카테고리를 삭제합니다.
@@ -195,8 +197,8 @@ async def delete_vendor_category(
 )
 async def create_vendor(
     vendor_in: ven_schemas.VendorCreate,
-    db: AsyncSession = Depends(get_session),
-    current_user: User = Depends(get_current_admin_user),
+    db: AsyncSession = Depends(deps.get_db_session),
+    current_user: User = Depends(deps.get_current_admin_user),
 ):
     """
     새로운 공급업체를 생성합니다.
@@ -231,7 +233,7 @@ async def create_vendor(
     response_model=List[ven_schemas.VendorRead],
     summary="모든 공급업체 조회",
 )
-async def read_vendors(db: AsyncSession = Depends(get_session), skip: int = 0, limit: int = 100):
+async def read_vendors(db: AsyncSession = Depends(deps.get_db_session), skip: int = 0, limit: int = 100):
     """
     모든 공급업체 목록을 조회합니다.
     """
@@ -248,7 +250,7 @@ async def read_vendors(db: AsyncSession = Depends(get_session), skip: int = 0, l
     response_model=ven_schemas.VendorReadWithDetails,
     summary="특정 공급업체 상세 조회",
 )
-async def read_vendor(vendor_id: int, db: AsyncSession = Depends(get_session)):
+async def read_vendor(vendor_id: int, db: AsyncSession = Depends(deps.get_db_session)):
     """
     ID로 특정 공급업체의 상세 정보(담당자 포함)를 조회합니다.
     """
@@ -277,8 +279,8 @@ async def read_vendor(vendor_id: int, db: AsyncSession = Depends(get_session)):
 async def update_vendor(
     vendor_id: int,
     vendor_in: ven_schemas.VendorUpdate,
-    db: AsyncSession = Depends(get_session),
-    current_user: User = Depends(get_current_admin_user),  # 권한 추가
+    db: AsyncSession = Depends(deps.get_db_session),
+    current_user: User = Depends(deps.get_current_admin_user),  # 권한 추가
 ):
     """
     ID로 특정 공급업체의 정보를 수정합니다.
@@ -296,8 +298,8 @@ async def update_vendor(
 )
 async def delete_vendor(
     vendor_id: int,
-    db: AsyncSession = Depends(get_session),
-    current_user: User = Depends(get_current_admin_user),  # 권한 추가
+    db: AsyncSession = Depends(deps.get_db_session),
+    current_user: User = Depends(deps.get_current_admin_user),  # 권한 추가
 ):
     """
     ID로 특정 공급업체를 삭제합니다.
@@ -322,8 +324,8 @@ async def delete_vendor(
 )
 async def create_vendor_contact(
     contact_in: ven_schemas.VendorContactCreate,
-    db: AsyncSession = Depends(get_session),
-    current_user: User = Depends(get_current_admin_user),  # 권한 추가
+    db: AsyncSession = Depends(deps.get_db_session),
+    current_user: User = Depends(deps.get_current_admin_user),  # 권한 추가
 ):
     """
     새로운 공급업체 담당자 정보를 생성합니다.
@@ -341,7 +343,7 @@ async def create_vendor_contact(
     summary="특정 공급업체의 모든 담당자 조회",
 )
 async def read_contacts_for_vendor(
-    vendor_id: int, db: AsyncSession = Depends(get_session)
+    vendor_id: int, db: AsyncSession = Depends(deps.get_db_session)
 ):
     """
     특정 공급업체에 속한 모든 담당자 목록을 조회합니다.
@@ -363,7 +365,7 @@ async def read_contacts_for_vendor(
     summary="특정 공급업체 담당자 조회",
 )
 async def read_vendor_contact(
-    contact_id: int, db: AsyncSession = Depends(get_session)
+    contact_id: int, db: AsyncSession = Depends(deps.get_db_session)
 ):
     """
     ID를 기준으로 특정 공급업체 담당자를 조회합니다.
@@ -382,8 +384,8 @@ async def read_vendor_contact(
 async def update_vendor_contact(
     contact_id: int,
     contact_in: ven_schemas.VendorContactUpdate,
-    db: AsyncSession = Depends(get_session),
-    current_user: User = Depends(get_current_admin_user),  # 권한 추가
+    db: AsyncSession = Depends(deps.get_db_session),
+    current_user: User = Depends(deps.get_current_admin_user),  # 권한 추가
 ):
     """
     ID로 특정 공급업체 담당자의 정보를 수정합니다.
@@ -403,8 +405,8 @@ async def update_vendor_contact(
 )
 async def delete_vendor_contact(
     contact_id: int,
-    db: AsyncSession = Depends(get_session),
-    current_user: User = Depends(get_current_admin_user),  # 관리자 권한 추가
+    db: AsyncSession = Depends(deps.get_db_session),
+    current_user: User = Depends(deps.get_current_admin_user),  # 관리자 권한 추가
 ):
     """
     ID로 특정 공급업체 담당자를 삭제합니다.
@@ -429,8 +431,8 @@ async def delete_vendor_contact(
 )
 async def create_vendor_vendor_category(
     link_in: ven_schemas.VendorVendorCategoryCreate,
-    db: AsyncSession = Depends(get_session),
-    current_user: User = Depends(get_current_admin_user),  # 관리자 권한 필요
+    db: AsyncSession = Depends(deps.get_db_session),
+    current_user: User = Depends(deps.get_current_admin_user),  # 관리자 권한 필요
 ):
     """
     특정 공급업체에 카테고리를 연결합니다.
@@ -464,7 +466,7 @@ async def create_vendor_vendor_category(
     summary="특정 공급업체에 연결된 모든 카테고리 조회",
 )
 async def read_vendor_categories_for_vendor(
-    vendor_id: int, db: AsyncSession = Depends(get_session)
+    vendor_id: int, db: AsyncSession = Depends(deps.get_db_session)
 ):
     """
     특정 공급업체에 연결된 모든 카테고리 목록을 조회합니다.
@@ -488,8 +490,8 @@ async def read_vendor_categories_for_vendor(
 async def delete_vendor_vendor_category(
     vendor_id: int,
     vendor_category_id: int,
-    db: AsyncSession = Depends(get_session),
-    current_user: User = Depends(get_current_admin_user),  # 관리자 권한 필요
+    db: AsyncSession = Depends(deps.get_db_session),
+    current_user: User = Depends(deps.get_current_admin_user),  # 관리자 권한 필요
 ):
     """
     특정 공급업체와 카테고리 간의 연결을 해제합니다.

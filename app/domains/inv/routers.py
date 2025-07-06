@@ -4,16 +4,16 @@
 'inv' 도메인 (PostgreSQL 'inv' 스키마)의 API 엔드포인트를 정의하는 모듈입니다.
 """
 
-from typing import List, Optional
+from typing import List  # , Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Response, Request
-from sqlmodel import Session, select
-from sqlalchemy.orm import selectinload
-from sqlalchemy.orm.attributes import flag_modified
+from sqlmodel import Session  # , select
+# from sqlalchemy.orm import selectinload
+# from sqlalchemy.orm.attributes import flag_modified
 
 #  의존성 및 다른 도메인 모듈 임포트
-from app.core.dependencies import get_db_session_dependency, get_current_active_user, get_current_admin_user
+from app.core import dependencies as deps
 from app.domains.usr.models import User as UsrUser
-from app.domains.inv import crud as inv_crud, models as inv_models, schemas as inv_schemas
+from app.domains.inv import crud as inv_crud, schemas as inv_schemas   # models as inv_models,
 
 router = APIRouter(
     tags=["Inventory Management (자재 관리)"],
@@ -27,8 +27,8 @@ router = APIRouter(
 @router.post("/material_categories", response_model=inv_schemas.MaterialCategoryResponse, status_code=status.HTTP_201_CREATED)
 async def create_material_category(
     category_create: inv_schemas.MaterialCategoryCreate,
-    db: Session = Depends(get_db_session_dependency),
-    current_user: UsrUser = Depends(get_current_admin_user)
+    db: Session = Depends(deps.get_db_session),
+    current_user: UsrUser = Depends(deps.get_current_admin_user)
 ):
     if await inv_crud.material_category.get_by_code(db, code=category_create.code):
         raise HTTPException(status_code=400, detail="Material category with this code already exists.")
@@ -36,12 +36,12 @@ async def create_material_category(
 
 
 @router.get("/material_categories", response_model=List[inv_schemas.MaterialCategoryResponse])
-async def read_material_categories(skip: int = 0, limit: int = 100, db: Session = Depends(get_db_session_dependency)):
+async def read_material_categories(skip: int = 0, limit: int = 100, db: Session = Depends(deps.get_db_session)):
     return await inv_crud.material_category.get_multi(db, skip=skip, limit=limit)
 
 
 @router.get("/material_categories/{category_code}", response_model=inv_schemas.MaterialCategoryResponse)
-async def read_material_category(category_code: str, db: Session = Depends(get_db_session_dependency)):
+async def read_material_category(category_code: str, db: Session = Depends(deps.get_db_session)):
     db_category = await inv_crud.material_category.get_by_code(db, code=category_code)
     if db_category is None:
         raise HTTPException(status_code=404, detail="Material category not found.")
@@ -52,8 +52,8 @@ async def read_material_category(category_code: str, db: Session = Depends(get_d
 async def update_material_category(
     category_code: str,
     category_update: inv_schemas.MaterialCategoryUpdate,
-    db: Session = Depends(get_db_session_dependency),
-    current_user: UsrUser = Depends(get_current_admin_user)
+    db: Session = Depends(deps.get_db_session),
+    current_user: UsrUser = Depends(deps.get_current_admin_user)
 ):
     db_category = await inv_crud.material_category.get_by_code(db, code=category_code)
     if db_category is None:
@@ -62,7 +62,7 @@ async def update_material_category(
 
 
 @router.delete("/material_categories/{category_code}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_material_category(category_code: str, db: Session = Depends(get_db_session_dependency), current_user: UsrUser = Depends(get_current_admin_user)):
+async def delete_material_category(category_code: str, db: Session = Depends(deps.get_db_session), current_user: UsrUser = Depends(deps.get_current_admin_user)):
     db_category = await inv_crud.material_category.get_by_code(db, code=category_code)
     if db_category is None:
         raise HTTPException(status_code=404, detail="Material category not found.")
@@ -78,16 +78,16 @@ async def delete_material_category(category_code: str, db: Session = Depends(get
 # @router.post("/material_spec_definitions", response_model=inv_schemas.MaterialSpecDefinitionResponse, status_code=status.HTTP_201_CREATED)
 # async def create_material_spec_definition(
 #     spec_def_create: inv_schemas.MaterialSpecDefinitionCreate,
-#     db: Session = Depends(get_db_session_dependency),
-#     current_user: UsrUser = Depends(get_current_admin_user)
+#     db: Session = Depends(deps.get_db_session),
+#     current_user: UsrUser = Depends(deps.get_current_admin_user)
 # ):
 #     return await inv_crud.material_spec_definition.create(db=db, obj_in=spec_def_create)
 
 @router.post("/material_spec_definitions", response_model=inv_schemas.MaterialSpecDefinitionResponse, status_code=status.HTTP_201_CREATED)
 async def create_material_spec_definition(
     spec_def_create: inv_schemas.MaterialSpecDefinitionCreate,
-    db: Session = Depends(get_db_session_dependency),
-    current_user: UsrUser = Depends(get_current_admin_user)
+    db: Session = Depends(deps.get_db_session),
+    current_user: UsrUser = Depends(deps.get_current_admin_user)
 ):
     """새로운 자재 스펙 정의를 생성합니다. 관리자 권한이 필요합니다."""
     return await inv_crud.material_spec_definition.create(db=db, obj_in=spec_def_create)
@@ -97,8 +97,8 @@ async def create_material_spec_definition(
 # async def update_material_spec_definition(
 #     spec_def_id: int,
 #     spec_def_update: inv_schemas.MaterialSpecDefinitionUpdate,
-#     db: Session = Depends(get_db_session_dependency),
-#     current_user: UsrUser = Depends(get_current_admin_user)
+#     db: Session = Depends(deps.get_db_session),
+#     current_user: UsrUser = Depends(deps.get_current_admin_user)
 # ):
 #     """
 #     [신규] 자재 스펙 정의를 업데이트합니다.
@@ -121,8 +121,8 @@ async def update_material_spec_definition(
     spec_def_id: int,
     spec_def_update: inv_schemas.MaterialSpecDefinitionUpdate,
     request: Request,  # Request 객체 주입
-    db: Session = Depends(get_db_session_dependency),
-    current_user: UsrUser = Depends(get_current_admin_user)
+    db: Session = Depends(deps.get_db_session),
+    current_user: UsrUser = Depends(deps.get_current_admin_user)
 ):
     """
     자재 스펙 정의를 업데이트합니다.
@@ -149,8 +149,8 @@ async def update_material_spec_definition(
 async def delete_material_spec_definition(
     spec_def_id: int,
     request: Request,  # Request 객체 주입
-    db: Session = Depends(get_db_session_dependency),
-    current_user: UsrUser = Depends(get_current_admin_user)
+    db: Session = Depends(deps.get_db_session),
+    current_user: UsrUser = Depends(deps.get_current_admin_user)
 ):
     """자재 스펙 정의를 삭제합니다. 관리자 권한이 필요합니다."""
     db_spec_def = await inv_crud.material_spec_definition.get(db, id=spec_def_id)
@@ -170,8 +170,8 @@ async def delete_material_spec_definition(
 # @router.post("/material_category_spec_definitions", response_model=inv_schemas.MaterialCategorySpecDefinitionResponse, status_code=status.HTTP_201_CREATED)
 # async def add_spec_definition_to_material_category(
 #     link_create: inv_schemas.MaterialCategorySpecDefinitionCreate,
-#     db: Session = Depends(get_db_session_dependency),
-#     current_user: UsrUser = Depends(get_current_admin_user)
+#     db: Session = Depends(deps.get_db_session),
+#     current_user: UsrUser = Depends(deps.get_current_admin_user)
 # ):
 #     """카테고리에 스펙 정의를 연결하고, 관련된 모든 자재의 스펙에 해당 키를 null 값으로 자동 추가합니다."""
 #     db_category = await inv_crud.material_category.get(db, id=link_create.material_category_id)
@@ -207,8 +207,8 @@ async def delete_material_spec_definition(
 async def add_spec_definition_to_material_category(
     link_create: inv_schemas.MaterialCategorySpecDefinitionCreate,
     request: Request,  # Request 객체 주입
-    db: Session = Depends(get_db_session_dependency),
-    current_user: UsrUser = Depends(get_current_admin_user)
+    db: Session = Depends(deps.get_db_session),
+    current_user: UsrUser = Depends(deps.get_current_admin_user)
 ):
     """카테고리에 스펙 정의를 연결하고, 관련된 모든 자재의 스펙에 해당 키를 null 값으로 자동 추가합니다. 관리자 권한이 필요합니다."""
     db_category = await inv_crud.material_category.get(db, id=link_create.material_category_id)
@@ -231,8 +231,8 @@ async def add_spec_definition_to_material_category(
 # async def remove_spec_definition_from_material_category(
 #     material_category_id: int,
 #     spec_definition_id: int,
-#     db: Session = Depends(get_db_session_dependency),
-#     current_user: UsrUser = Depends(get_current_admin_user)
+#     db: Session = Depends(deps.get_db_session),
+#     current_user: UsrUser = Depends(deps.get_current_admin_user)
 # ):
 #     """카테고리와 스펙 정의 연결을 해제하고, 관련된 모든 자재의 스펙에서 해당 키를 삭제합니다."""
 #     spec_def_to_delete = await inv_crud.material_spec_definition.get(db, id=spec_definition_id)
@@ -267,8 +267,8 @@ async def remove_spec_definition_from_material_category(
     material_category_id: int,
     spec_definition_id: int,
     request: Request,  # Request 객체 주입
-    db: Session = Depends(get_db_session_dependency),
-    current_user: UsrUser = Depends(get_current_admin_user)
+    db: Session = Depends(deps.get_db_session),
+    current_user: UsrUser = Depends(deps.get_current_admin_user)
 ):
     """카테고리와 스펙 정의 연결을 해제하고, 관련된 모든 자재의 스펙에서 해당 키를 삭제합니다. 관리자 권한이 필요합니다."""
     # ARQ Redis 클라이언트를 CRUD 메서드로 전달
@@ -287,14 +287,14 @@ async def remove_spec_definition_from_material_category(
 @router.post("/materials", response_model=inv_schemas.MaterialResponse, status_code=status.HTTP_201_CREATED)
 async def create_material(
     material_create: inv_schemas.MaterialCreate,
-    db: Session = Depends(get_db_session_dependency),
-    current_user: UsrUser = Depends(get_current_admin_user)
+    db: Session = Depends(deps.get_db_session),
+    current_user: UsrUser = Depends(deps.get_current_admin_user)
 ):
     return await inv_crud.material.create(db=db, obj_in=material_create)
 
 
 @router.get("/materials/{material_code}", response_model=inv_schemas.MaterialResponse)
-async def read_material(material_code: str, db: Session = Depends(get_db_session_dependency)):
+async def read_material(material_code: str, db: Session = Depends(deps.get_db_session)):
     db_material = await inv_crud.material.get_by_code(db, code=material_code)
     if db_material is None:
         raise HTTPException(status_code=404, detail="Material not found.")
@@ -308,8 +308,8 @@ async def read_material(material_code: str, db: Session = Depends(get_db_session
 async def create_or_update_material_spec(
     spec_create_update: inv_schemas.MaterialSpecCreate,
     response: Response,
-    db: Session = Depends(get_db_session_dependency),
-    current_user: UsrUser = Depends(get_current_admin_user)
+    db: Session = Depends(deps.get_db_session),
+    current_user: UsrUser = Depends(deps.get_current_admin_user)
 ):
     if not await inv_crud.material.get(db, id=spec_create_update.materials_id):
         raise HTTPException(status_code=404, detail="Material not found.")
@@ -327,8 +327,8 @@ async def create_or_update_material_spec(
 async def update_material_spec_by_material_code(
     material_code: str,
     spec_update: inv_schemas.MaterialSpecUpdate,
-    db: Session = Depends(get_db_session_dependency),
-    current_user: UsrUser = Depends(get_current_admin_user)
+    db: Session = Depends(deps.get_db_session),
+    current_user: UsrUser = Depends(deps.get_current_admin_user)
 ):
     db_material = await inv_crud.material.get_by_code(db, code=material_code)
     if not db_material:
@@ -342,7 +342,7 @@ async def update_material_spec_by_material_code(
 
 
 @router.get("/materials/{material_code}/specs", response_model=inv_schemas.MaterialSpecResponse)
-async def read_material_specs(material_code: str, db: Session = Depends(get_db_session_dependency)):
+async def read_material_specs(material_code: str, db: Session = Depends(deps.get_db_session)):
     db_material = await inv_crud.material.get_by_code(db, code=material_code)
     if not db_material:
         raise HTTPException(status_code=404, detail="Material not found.")
@@ -360,8 +360,8 @@ async def read_material_specs(material_code: str, db: Session = Depends(get_db_s
 @router.post("/material_transactions", response_model=inv_schemas.MaterialTransactionResponse, status_code=status.HTTP_201_CREATED)
 async def create_material_transaction(
     transaction_create: inv_schemas.MaterialTransactionCreate,
-    db: Session = Depends(get_db_session_dependency),
-    current_user: UsrUser = Depends(get_current_active_user)
+    db: Session = Depends(deps.get_db_session),
+    current_user: UsrUser = Depends(deps.get_current_active_user)
 ):
     if transaction_create.performed_by_user_id is None:
         transaction_create.performed_by_user_id = current_user.id

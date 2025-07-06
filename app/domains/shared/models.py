@@ -20,6 +20,7 @@ from sqlmodel import Field, Relationship, SQLModel, Column
 # TYPE_CHECKING을 사용하여 순환 임포트 문제를 방지합니다.
 if TYPE_CHECKING:
     from app.domains.usr.models import User, Department  # User 모델 참조
+    from app.domains.rpt.models import ReportForm  # ReportForm 모델 참조
 
 
 # =============================================================================
@@ -207,3 +208,29 @@ class EntityImage(EntityImageBase, table=True):
     # 직접적인 ORM Relationship을 정의하기 어렵습니다.
     # 이 부분은 애플리케이션 로직(services/crud)에서 처리되어야 합니다.
     # 예: fms.equipments, inv.materials, loc.locations, ven.vendors, lims.samples, lims.test_requests 등
+
+
+# =============================================================================
+# 5. shared files 테이블 모델
+# =============================================================================
+class FileBase(SQLModel):
+    """
+    범용 파일 테이블의 기본 속성을 정의하는 SQLModel Base 클래스입니다.
+    """
+    path: str = Field(unique=True, description="파일 저장 경로")
+    name: str = Field(description="원본 파일 이름")
+    content_type: str = Field(description="파일의 MIME 타입")
+    size: int = Field(description="파일 크기 (bytes)")
+
+
+class File(FileBase, table=True):
+    """
+    shared.file 테이블 모델을 정의하는 클래스입니다.
+    """
+    __tablename__ = "shared_file"
+
+    id: int = Field(default=None, primary_key=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow, nullable=False)
+
+    #  rpt.ReportForm 과의 관계 설정 (새롭게 추가)
+    report_forms: List["ReportForm"] = Relationship(back_populates="template_file")

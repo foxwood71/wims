@@ -15,6 +15,10 @@ FastAPI 애플리케이션의 핵심 구성 요소 패키지입니다.
 핵심 구성 요소들을 패키지 레벨에서 직접 접근할 수 있도록 노출할 수 있습니다.
 """
 
+
+# flake8: noqa
+from . import config, db, security, dependencies
+
 # 패키지 메타데이터 (선택 사항)
 __title__ = "WIMS Core"
 __description__ = "Core components for WIMS FastAPI application."
