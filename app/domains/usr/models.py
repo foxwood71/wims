@@ -21,7 +21,7 @@ from enum import IntEnum  # [추가] IntEnum을 임포트합니다.
 # 다른 도메인의 모델을 참조해야 할 경우
 # TYPE_CHECKING을 사용하여 순환 임포트 문제를 방지합니다.
 if TYPE_CHECKING:
-    from app.domains.shared.models import Image
+    from app.domains.shared.models import Image, File
     from app.domains.lims.models import TestRequest, Sample, AliquotSample, WorksheetData, AnalysisResult, TestRequestTemplate, PrView, CalibrationRecord, QcSampleResult
     from app.domains.fms.models import EquipmentHistory
     from app.domains.inv.models import MaterialTransaction
@@ -134,6 +134,11 @@ class User(UserBase, table=True):
     uploaded_images: List["Image"] = Relationship(
         back_populates="uploaded_by_user",
         sa_relationship_kwargs={"foreign_keys": "[Image.uploaded_by_user_id]"}
+    )
+
+    uploaded_files: List["File"] = Relationship(
+        back_populates="uploaded_by_user",
+        sa_relationship_kwargs={"foreign_keys": "[File.uploaded_by_user_id]"}
     )
 
     equipment_history_records: List["EquipmentHistory"] = Relationship(back_populates="performed_by_user")

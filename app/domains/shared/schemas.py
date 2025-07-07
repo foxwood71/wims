@@ -7,10 +7,9 @@
 직렬화를 위한 Pydantic 모델을 포함합니다.
 SQLModel의 기능을 활용하여 데이터베이스 ORM 모델과 Pydantic 모델 간의 일관성을 유지합니다.
 """
-
-from typing import Optional, List
+from typing import Optional  # , List
 from datetime import datetime, date
-from pydantic import BaseModel, Field, HttpUrl  # BaseModel도 명시적으로 임포트
+from pydantic import BaseModel, Field, computed_field  # noqa:F401 BaseModel도 명시적으로 임포트
 from sqlmodel import SQLModel  # SQLModel 클래스 임포트
 
 
@@ -204,6 +203,54 @@ class EntityImageRead(EntityImageBase):
     id: int = Field(..., description="연결 고유 ID")
     created_at: datetime = Field(..., description="레코드 생성 일시")
     updated_at: datetime = Field(..., description="레코드 마지막 업데이트 일시")
+    image: Optional[ImageRead] = Field(None, description="연결된 이미지 상세 정보")
 
     class Config:
         from_attributes = True
+
+
+# ==============================================================================
+# 5. app.files 테이블 스키마
+# ==============================================================================
+class FileBase(BaseModel):
+    """
+    파일의 기본 정보 스키마입니다.
+    """
+    name: str = Field(..., max_length=255, description="원본 파일 이름")
+    content_type: str = Field(..., max_length=255, description="파일의 MIME 타입")
+    size: int = Field(..., gt=0, description="파일 크기 (bytes)")
+
+
+class FileUploadResponse(BaseModel):
+    """
+    파일 업로드 성공 시 반환되는 정보입니다.
+    """
+    id: int = Field(..., description="저장된 파일의 고유 ID")
+    url: str = Field(..., description="파일에 접근할 수 있는 URL")
+    message: str = Field(default="File uploaded successfully.", description="성공 메시지")
+
+
+class FileRead(FileBase):
+    """
+    파일 정보 조회 시 반환되는 전체 스키마입니다.
+    """
+    id: int = Field(..., description="파일 고유 ID")
+    name: str = Field(..., description="원본 파일 이름")
+    # path: str = Field(..., description="서버에 저장된 파일의 상대 경로")
+    content_type: str
+    size: int = Field(..., description="파일 크기 (bytes)")
+    created_at: datetime = Field(..., description="생성 일시")
+    updated_at: Optional[datetime] = Field(None, description="마지막 수정 일시")
+    uploaded_by_user_id: Optional[int] = Field(None, description="파일을 업로드한 사용자 ID (FK)")
+    department_id: Optional[int] = Field(None, description="파일 소유 부서")
+
+    @computed_field
+    @property
+    def url(self) -> str:
+        """
+        파일 ID를 이용해 다운로드 URL을 동적으로 생성합니다.
+        """
+        return f"/api/v1/shared/files/download/{self.id}"
+
+    class Config:
+        from_attributes = True  # ORM 모델을 Pydantic 모델로 변환 (v2부터 이름 변경)

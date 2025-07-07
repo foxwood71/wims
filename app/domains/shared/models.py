@@ -221,6 +221,23 @@ class FileBase(SQLModel):
     name: str = Field(description="원본 파일 이름")
     content_type: str = Field(description="파일의 MIME 타입")
     size: int = Field(description="파일 크기 (bytes)")
+    uploaded_by_user_id: Optional[int] = Field(
+        default=None,
+        sa_column=Column(
+            ForeignKey("usr.users.id", onupdate="CASCADE", ondelete="SET NULL")  # usr 스키마 참조
+        ),
+        description="이미지를 업로드한 사용자 ID (FK)"
+    )
+    department_id: Optional[int] = Field(
+        default=None,
+        foreign_key="usr.departments.id",
+        description="이미지 소유 부서 ID (FK)"
+    )
+    uploaded_at: datetime = Field(
+        default_factory=lambda: datetime.now(UTC),
+        sa_column=Column(TIMESTAMP(timezone=True), server_default=func.now()),  #
+        description="이미지 업로드 일시"
+    )
 
 
 class File(FileBase, table=True):
@@ -230,7 +247,27 @@ class File(FileBase, table=True):
     __tablename__ = "shared_file"
 
     id: int = Field(default=None, primary_key=True)
-    created_at: datetime = Field(default_factory=datetime.utcnow, nullable=False)
+
+    created_at: Optional[datetime] = Field(
+        default_factory=lambda: datetime.now(UTC),  # datetime.utcnow 대신 datetime.now(UTC) 사용
+        sa_column=Column(TIMESTAMP(timezone=True), server_default=func.now()),
+        description="레코드 생성 일시"
+    )
+    updated_at: Optional[datetime] = Field(
+        default_factory=lambda: datetime.now(UTC),  # datetime.utcnow 대신 datetime.now(UTC) 사용
+        sa_column=Column(TIMESTAMP(timezone=True), server_default=func.now(), onupdate=func.now()),
+        description="레코드 마지막 업데이트 일시"
+    )
+    # 관계 정의:
+    # User(usr.users)와의 관계 (다대일)
+    uploaded_by_user: Optional["User"] = Relationship(
+        back_populates="uploaded_files",  # User 모델의 'uploaded_images' 속성과 일치
+        sa_relationship_kwargs={
+            "foreign_keys": "File.uploaded_by_user_id",  # 명시적인 foreign_key 지정
+            "cascade": "all"
+        }
+    )
+    department: Optional["Department"] = Relationship()
 
     #  rpt.ReportForm 과의 관계 설정 (새롭게 추가)
     report_forms: List["ReportForm"] = Relationship(back_populates="template_file")

@@ -8,18 +8,16 @@ CRUD 작업을 위한 HTTP 엔드포인트를 제공합니다.
 FastAPI의 APIRouter를 사용하여 엔드포인트를 그룹화하고 관리하며,
 역할 기반 접근 제어(RBAC)를 포함한 세분화된 권한 모델을 적용합니다.
 """
-import os
 import math
 from pathlib import Path
 from datetime import datetime, UTC
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, Form, File
 from sqlmodel import Session, update
-
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, Form, File
+from fastapi.responses import FileResponse
 
 # 핵심 의존성 (데이터베이스 세션, 사용자 인증 등)
-from app.utils.files import save_upload_file_to_static
 from app.core import dependencies as deps
 from app.domains.usr.models import User as UsrUser, UserRole
 
@@ -44,7 +42,7 @@ router = APIRouter(
 @router.post("/versions", response_model=shared_schemas.VersionRead, status_code=status.HTTP_201_CREATED)
 async def create_version(
     version_create: shared_schemas.VersionCreate,
-    db: Session = Depends(deps.get_db_session_dependency),
+    db: Session = Depends(deps.get_db_session),
     current_user: UsrUser = Depends(deps.get_current_admin_user)
 ):
     """
@@ -61,7 +59,7 @@ async def create_version(
 async def read_versions(
     skip: int = 0,
     limit: int = 100,
-    db: Session = Depends(deps.get_db_session_dependency)
+    db: Session = Depends(deps.get_db_session)
 ):
     """
     모든 애플리케이션 버전 목록을 조회합니다.
@@ -73,7 +71,7 @@ async def read_versions(
 @router.get("/versions/{version_id}", response_model=shared_schemas.VersionRead)
 async def read_version(
     version_id: int,
-    db: Session = Depends(deps.get_db_session_dependency)
+    db: Session = Depends(deps.get_db_session)
 ):
     """
     특정 ID의 애플리케이션 버전을 조회합니다.
@@ -88,7 +86,7 @@ async def read_version(
 async def update_version(
     version_id: int,
     version_update: shared_schemas.VersionUpdate,
-    db: Session = Depends(deps.get_db_session_dependency),
+    db: Session = Depends(deps.get_db_session),
     current_user: UsrUser = Depends(deps.get_current_admin_user)
 ):
     """
@@ -104,7 +102,7 @@ async def update_version(
 @router.delete("/versions/{version_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_version(
     version_id: int,
-    db: Session = Depends(deps.get_db_session_dependency),
+    db: Session = Depends(deps.get_db_session),
     current_user: UsrUser = Depends(deps.get_current_admin_user)
 ):
     """
@@ -124,7 +122,7 @@ async def delete_version(
 @router.post("/image_types", response_model=shared_schemas.ImageTypeRead, status_code=status.HTTP_201_CREATED)
 async def create_image_type(
     image_type_create: shared_schemas.ImageTypeCreate,
-    db: Session = Depends(deps.get_db_session_dependency),
+    db: Session = Depends(deps.get_db_session),
     current_user: UsrUser = Depends(deps.get_current_admin_user)
 ):
     """
@@ -141,7 +139,7 @@ async def create_image_type(
 async def read_image_types(
     skip: int = 0,
     limit: int = 100,
-    db: Session = Depends(deps.get_db_session_dependency)
+    db: Session = Depends(deps.get_db_session)
 ):
     """
     모든 이미지 유형 목록을 조회합니다.
@@ -153,7 +151,7 @@ async def read_image_types(
 @router.get("/image_types/{image_type_id}", response_model=shared_schemas.ImageTypeRead)
 async def read_image_type(
     image_type_id: int,
-    db: Session = Depends(deps.get_db_session_dependency)
+    db: Session = Depends(deps.get_db_session)
 ):
     """
     특정 ID의 이미지 유형을 조회합니다.
@@ -168,7 +166,7 @@ async def read_image_type(
 async def update_image_type(
     image_type_id: int,
     image_type_update: shared_schemas.ImageTypeUpdate,
-    db: Session = Depends(deps.get_db_session_dependency),
+    db: Session = Depends(deps.get_db_session),
     current_user: UsrUser = Depends(deps.get_current_admin_user)
 ):
     """
@@ -184,7 +182,7 @@ async def update_image_type(
 @router.delete("/image_types/{image_type_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_image_type(
     image_type_id: int,
-    db: Session = Depends(deps.get_db_session_dependency),
+    db: Session = Depends(deps.get_db_session),
     current_user: UsrUser = Depends(deps.get_current_admin_user)
 ):
     """
@@ -207,7 +205,7 @@ async def upload_image(
     file: UploadFile = File(...),
     image_type_id: Optional[int] = Form(None),
     description: Optional[str] = Form(None),
-    db: Session = Depends(deps.get_db_session_dependency),
+    db: Session = Depends(deps.get_db_session),
     current_user: UsrUser = Depends(deps.get_current_active_user)
 ):
     """
@@ -254,7 +252,7 @@ async def read_images(
     skip: int = 0,
     limit: int = 100,
     uploaded_by_user_id: Optional[int] = None,
-    db: Session = Depends(deps.get_db_session_dependency)
+    db: Session = Depends(deps.get_db_session)
 ):
     """
     모든 이미지 또는 특정 사용자가 업로드한 이미지 목록을 조회합니다.
@@ -268,7 +266,7 @@ async def read_images(
 @router.get("/images/{image_id}", response_model=shared_schemas.ImageRead)
 async def read_image(
     image_id: int,
-    db: Session = Depends(deps.get_db_session_dependency)
+    db: Session = Depends(deps.get_db_session)
 ):
     """
     특정 ID의 이미지 정보를 조회합니다.
@@ -283,7 +281,7 @@ async def read_image(
 async def update_image(
     image_id: int,
     image_update: shared_schemas.ImageUpdate,
-    db: Session = Depends(deps.get_db_session_dependency),
+    db: Session = Depends(deps.get_db_session),
     current_user: UsrUser = Depends(deps.get_current_active_user)
 ):
     """
@@ -322,7 +320,7 @@ async def update_image(
 @router.delete("/images/{image_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_image(
     image_id: int,
-    db: Session = Depends(deps.get_db_session_dependency),
+    db: Session = Depends(deps.get_db_session),
     current_user: UsrUser = Depends(deps.get_current_active_user)
 ):
     """
@@ -366,7 +364,7 @@ async def delete_image(
 @router.post("/entity_images", response_model=shared_schemas.EntityImageRead, status_code=status.HTTP_201_CREATED)
 async def create_entity_image(
     entity_image_create: shared_schemas.EntityImageCreate,
-    db: Session = Depends(deps.get_db_session_dependency),
+    db: Session = Depends(deps.get_db_session),
     current_user: UsrUser = Depends(deps.get_current_active_user)
 ):
     """
@@ -379,11 +377,15 @@ async def create_entity_image(
     return await shared_crud.entity_image.create(db=db, obj_in=entity_image_create)
 
 
-@router.get("/entity_images/by_entity/{entity_type}/{entity_id}", response_model=List[shared_schemas.EntityImageRead])
+@router.get(
+    "/entity_images/by_entity/{entity_type}/{entity_id}",
+    response_model=List[shared_schemas.EntityImageRead],
+    summary="특정 엔티티의 모든 이미지 정보 조회 (상세 이미지 정보 포함)"
+)
 async def read_entity_images_for_entity(
     entity_type: str,
     entity_id: int,
-    db: Session = Depends(deps.get_db_session_dependency)
+    db: Session = Depends(deps.get_db_session)
 ):
     """
     특정 엔티티(유형과 ID)에 연결된 모든 이미지 정보를 조회합니다.
@@ -396,8 +398,8 @@ async def set_main_entity_image(
     entity_image_id: int,
     entity_type: str,
     entity_id: int,
-    db: Session = Depends(deps.get_db_session_dependency),
-    current_user: UsrUser = Depends(deps.get_current_admin_user)
+    db: Session = Depends(deps.get_db_session),
+    current_user: UsrUser = Depends(deps.get_current_active_user)
 ):
     """
     특정 엔티티에 대해 연결된 이미지 중 하나를 '대표 이미지'로 설정합니다.
@@ -429,8 +431,8 @@ async def set_main_entity_image(
 @router.delete("/entity_images/{entity_image_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_entity_image(
     entity_image_id: int,
-    db: Session = Depends(deps.get_db_session_dependency),
-    current_user: UsrUser = Depends(deps.get_current_admin_user)
+    db: Session = Depends(deps.get_db_session),
+    current_user: UsrUser = Depends(deps.get_current_active_user)
 ):
     """
     특정 엔티티와 이미지 간의 연결 정보를 삭제합니다. (실제 이미지는 삭제되지 않음) (관리자 권한 필요)
@@ -446,36 +448,76 @@ async def delete_entity_image(
 # ====================================================================
 # 5. File Upload End Pointer
 # ====================================================================
-@router.post(
-    "/files/",
-    response_model=shared_schemas.FileRead,
-    status_code=201,
-    tags=["File Management"]
-)
-def upload_general_file(
+# ==============================================================================
+# 파일(File) 관련 라우트 (이 부분을 추가)
+# ==============================================================================
+
+@router.post("/files/upload", response_model=shared_schemas.FileUploadResponse, status_code=201)
+async def upload_file(
     *,
-    session: Session = Depends(deps.get_session),
+    db: Session = Depends(deps.get_db_session),
+    current_user: UsrUser = Depends(deps.get_current_active_user),
     upload_file: UploadFile = File(...)
 ):
     """
-    엑셀, PDF 등 범용 파일을 업로드합니다.
+    파일을 서버에 업로드하고 데이터베이스에 메타데이터를 저장합니다.
     """
-    #  파일 저장 위치를 'files' 디렉토리로 지정
-    saved_path = save_upload_file_to_static("files", upload_file)
+    try:
+        db_file = await shared_crud.file.create_file(
+            db=db, file=upload_file, user_id=current_user.id
+        )
+        # 파일 접근 URL 생성 (필요에 따라 수정)
+        file_url = f"/api/v1/shared/files/download/{db_file.id}"
 
-    #  업로드된 파일의 크기를 다시 계산해야 합니다. (copyfileobj 후 커서가 끝으로 이동했기 때문)
-    upload_file.file.seek(0, os.SEEK_END)
-    file_size = upload_file.file.tell()
+        # --- 반환하는 딕셔너리의 키를 수정합니다 ---
+        return {
+            "id": db_file.id,  # 'file_id' -> 'id'로 수정
+            "url": file_url,    # 'file_url' -> 'url'로 수정
+            "message": "File uploaded successfully."
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"File could not be uploaded: {e}")
 
-    db_file = shared_models.File(
-        path=saved_path,
-        name=upload_file.filename,
-        content_type=upload_file.content_type,
-        size=file_size,
+
+@router.get("/files/download/{file_id}")
+async def download_file(
+    *,
+    db: Session = Depends(deps.get_db_session),
+    file_id: int,
+    # current_user: UsrUser = Depends(get_current_active_user), # 필요시 권한 체크
+):
+    """
+    ID를 사용하여 파일을 다운로드합니다.
+    """
+    db_file = await shared_crud.file.get_file(db=db, file_id=file_id)
+    if not db_file:
+        raise HTTPException(status_code=404, detail="File not found.")
+
+    # 실제 파일 시스템 경로 결합
+    file_path = shared_crud.file.get_full_file_path(db_file)
+    if not file_path.exists():
+        # DB에 레코드는 있으나 실제 파일이 없는 경우
+        raise HTTPException(status_code=500, detail="File not found on server.")
+
+    return FileResponse(
+        path=str(file_path),
+        filename=db_file.name,
+        media_type=db_file.content_type,
+        headers={"Content-Disposition": f"attachment; filename=\"{db_file.name}\""}
     )
 
-    session.add(db_file)
-    session.commit()
-    session.refresh(db_file)
 
+@router.get("/files/{file_id}", response_model=shared_schemas.FileRead)
+async def read_file_metadata(
+    *,
+    db: Session = Depends(deps.get_db_session),
+    file_id: int,
+    current_user: UsrUser = Depends(deps.get_current_active_user),
+):
+    """
+    파일의 메타데이터를 조회합니다.
+    """
+    db_file = await shared_crud.file.get_file(db=db, file_id=file_id)
+    if not db_file:
+        raise HTTPException(status_code=404, detail="File not found.")
     return db_file

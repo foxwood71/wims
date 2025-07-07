@@ -23,8 +23,7 @@ from app.main import app as main_app
 from app.core.database import get_session
 # app.core.security에서 get_password_hash 임포트
 from app.core.security import get_password_hash
-# app.core.dependencies에서 get_db_session_dependency, get_current_admin_user 임포트
-from app.core.dependencies import get_db_session_dependency, get_current_admin_user, get_current_active_user
+from app.core import dependencies as deps
 
 # 모든 도메인 모델 임포트 (SQLModel.metadata에 등록되도록)
 # usr (User, Department)
@@ -176,9 +175,9 @@ async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
     def override_get_session_and_dependency():
         yield db_session
 
-    # 핵심 변경: get_session과 get_db_session_dependency 모두 오버라이드
+    # 핵심 변경: get_session과 deps.get_db_session 모두 오버라이드
     main_app.dependency_overrides[get_session] = override_get_session_and_dependency
-    main_app.dependency_overrides[get_db_session_dependency] = override_get_session_and_dependency
+    main_app.dependency_overrides[deps.get_db_session] = override_get_session_and_dependency
 
     async with AsyncClient(transport=ASGITransport(app=main_app), base_url="http://test") as async_client:
         yield async_client
@@ -267,8 +266,8 @@ async def authorized_client(db_session: AsyncSession, test_user: UsrUser) -> Asy
         return test_user
 
     main_app.dependency_overrides[get_session] = override_get_session
-    main_app.dependency_overrides[get_db_session_dependency] = override_get_session
-    main_app.dependency_overrides[get_current_active_user] = override_get_current_active_user
+    main_app.dependency_overrides[deps.get_db_session] = override_get_session
+    main_app.dependency_overrides[deps.get_current_active_user] = override_get_current_active_user
 
     async with AsyncClient(transport=ASGITransport(app=main_app), base_url="http://test") as client_instance:
         login_data = {"username": test_user.username, "password": "testpassword123"}
@@ -289,15 +288,15 @@ async def admin_client(db_session: AsyncSession, test_admin_user: UsrUser) -> As
     def override_get_current_admin_user():
         return test_admin_user
 
-    # [핵심 수정] get_current_active_user도 관리자 유저를 반환하도록 재정의합니다.
+    # [핵심 수정] deps.get_current_active_user도 관리자 유저를 반환하도록 재정의합니다.
     def override_get_current_active_user_for_admin():
         return test_admin_user
 
     main_app.dependency_overrides[get_session] = override_get_session
-    main_app.dependency_overrides[get_db_session_dependency] = override_get_session
-    main_app.dependency_overrides[get_current_admin_user] = override_get_current_admin_user
+    main_app.dependency_overrides[deps.get_db_session] = override_get_session
+    main_app.dependency_overrides[deps.get_current_admin_user] = override_get_current_admin_user
     # [핵심 수정] 아래 라인이 반드시 추가되어야 합니다.
-    main_app.dependency_overrides[get_current_active_user] = override_get_current_active_user_for_admin
+    main_app.dependency_overrides[deps.get_current_active_user] = override_get_current_active_user_for_admin
 
     async with AsyncClient(transport=ASGITransport(app=main_app), base_url="http://test") as client_instance:
         login_data = {"username": test_admin_user.username, "password": "adminpassword123"}
@@ -319,19 +318,19 @@ async def superuser_client_fixture(
         yield db_session
 
     main_app.dependency_overrides[get_session] = override_get_session_and_dependency
-    main_app.dependency_overrides[get_db_session_dependency] = override_get_session_and_dependency
+    main_app.dependency_overrides[deps.get_db_session] = override_get_session_and_dependency
 
-    # get_current_admin_user 픽스처를 재정의 (최고관리자도 admin_user 데코레이터를 통과한다고 가정)
+    # deps.get_current_admin_user 픽스처를 재정의 (최고관리자도 admin_user 데코레이터를 통과한다고 가정)
     def override_get_current_admin_user():
         return test_superuser
 
-    main_app.dependency_overrides[get_current_admin_user] = override_get_current_admin_user
+    main_app.dependency_overrides[deps.get_current_admin_user] = override_get_current_admin_user
 
-    # get_current_active_user 픽스처를 재정의
+    # deps.get_current_active_user 픽스처를 재정의
     def override_get_current_active_user():
         return test_superuser
 
-    main_app.dependency_overrides[get_current_active_user] = override_get_current_active_user
+    main_app.dependency_overrides[deps.get_current_active_user] = override_get_current_active_user
 
     async with AsyncClient(transport=ASGITransport(app=main_app), base_url="http://test") as client_instance:
         login_data = {
@@ -351,8 +350,8 @@ async def superuser_client_fixture(
 @pytest_asyncio.fixture(scope="function")
 async def facility_manager_client(client: AsyncClient, test_facility_manager: UsrUser) -> AsyncClient:
     """[신규] 설비 관리자로 인증된 클라이언트를 반환합니다."""
-    # get_current_active_user 의존성을 재정의하여, API 호출 시 설비 관리자 유저를 반환하도록 설정
-    main_app.dependency_overrides[get_current_active_user] = lambda: test_facility_manager
+    # deps.get_current_active_user 의존성을 재정의하여, API 호출 시 설비 관리자 유저를 반환하도록 설정
+    main_app.dependency_overrides[deps.get_current_active_user] = lambda: test_facility_manager
 
     # 로그인 API를 통해 토큰 획득
     login_data = {"username": test_facility_manager.username, "password": "facilitypass"}

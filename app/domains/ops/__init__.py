@@ -20,11 +20,12 @@ FastAPI 애플리케이션의 'ops' 도메인 패키지입니다.
 패키지의 목적을 문서화합니다.
 """
 
+# from . import models, schemas, router, crud  # noqa: F401
 # 패키지 메타데이터 (선택 사항)
 __title__ = "WIMS Operations Domain"
 __description__ = "Manages operational data (lines, daily plant/line operations, user views)."
-__version__ = "0.1.0" # ops 도메인 패키지의 버전
-__all__ = [] # 'from app.domains.ops import *' 시 내보낼 이름 목록. 일반적으로 비워둡니다.
+__version__ = "0.1.0"  # ops 도메인 패키지의 버전
+__all__ = []  # 'from app.domains.ops import *' 시 내보낼 이름 목록. 일반적으로 비워둡니다.
 
 # (선택 사항) 이 패키지에서 다른 패키지로 공통 모델이나 스키마를 노출할 수 있습니다.
 # 예를 들어, DailyPlantOperation 모델이 다른 도메인에서 자주 참조된다면 여기서 노출할 수 있습니다.

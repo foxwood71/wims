@@ -27,11 +27,13 @@ QC 시료 결과(QCSampleResult)와 같은 QA/QC 관련 데이터도 관리합�
 패키지의 목적을 문서화합니다.
 """
 
+
+# from . import models, schemas, router, crud  # noqa: F401
 # 패키지 메타데이터 (선택 사항)
 __title__ = "WIMS LIMS & QA/QC Domain"
 __description__ = "Manages laboratory information and quality control data."
-__version__ = "0.1.0" # lims 도메인 패키지의 버전
-__all__ = [] # 'from app.domains.lims import *' 시 내보낼 이름 목록. 일반적으로 비워둡니다.
+__version__ = "0.1.0"  # lims 도메인 패키지의 버전
+__all__ = []  # 'from app.domains.lims import *' 시 내보낼 이름 목록. 일반적으로 비워둡니다.
 
 # (선택 사항) 이 패키지에서 다른 패키지로 공통 모델이나 스키마를 노출할 수 있습니다.
 # 예를 들어, Parameter 모델이 다른 도메인에서 자주 참조된다면 여기서 노출할 수 있습니다.

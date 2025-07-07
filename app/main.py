@@ -10,8 +10,9 @@ from fastapi.staticfiles import StaticFiles
 
 
 # 핵심 설정 및 데이터베이스 모듈 임포트 (경로 변경 반영)
-from app.core.config import settings
-from app.core.database import create_db_and_tables, engine, get_session
+from app.core.config import settings  # noqa: F401
+from app.core.database import engine, get_session
+
 
 # 각 도메인의 라우터들을 임포트합니다.
 # 모든 도메인이 'app/domains' 하위 폴더에 있으므로, 경로를 정확히 지정합니다.

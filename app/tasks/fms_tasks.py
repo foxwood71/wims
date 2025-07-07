@@ -1,8 +1,6 @@
 # app/tasks/fms_equipment_tasks.py (수정된 코드)
 
-import json
 from sqlalchemy.sql import text
-from app.core.database import get_async_session_context
 
 
 async def sync_equipment_specs_on_spec_definition_name_change(
@@ -15,6 +13,9 @@ async def sync_equipment_specs_on_spec_definition_name_change(
     EquipmentSpecDefinition의 이름이 변경되었을 때,
     관련된 모든 EquipmentSpec의 specs JSONB 필드의 키를 업데이트하는 백그라운드 작업.
     """
+    # get_async_session_context를 함수 내부에서 임포트합니다.
+    from app.core.database import get_async_session_context  # 순환 임포트 때문에 함수 내부에서 정의
+
     print(f"백그라운드 작업 시작: EquipmentSpecDefinition ID {spec_definition_id}의 이름 변경 동기화: '{old_spec_name}' -> '{new_spec_name}'")
 
     # PostgreSQL의 jsonb 함수를 사용하여 단일 UPDATE 쿼리 실행
@@ -28,6 +29,7 @@ async def sync_equipment_specs_on_spec_definition_name_change(
 
     updated_count = 0
     async with get_async_session_context() as db:
+        # 이 스펙 정의를 사용하는 모든 EquipmentSpec 데이터를 조회
         try:
             result = await db.execute(
                 query,
@@ -56,6 +58,8 @@ async def sync_equipment_specs_on_spec_definition_delete(
     EquipmentSpecDefinition이 삭제되었을 때,
     관련된 모든 EquipmentSpec의 specs JSONB 필드에서 해당 키를 제거하는 백그라운드 작업.
     """
+    from app.core.database import get_async_session_context  # 순환 임포트 때문에 함수 내부에서 정의
+
     print(f"백그라운드 작업 시작: EquipmentSpecDefinition ID {spec_definition_id} 삭제 동기화: '{spec_name_to_remove}' 제거")
 
     # PostgreSQL의 jsonb 함수를 사용하여 단일 UPDATE 쿼리 실행

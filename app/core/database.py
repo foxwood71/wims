@@ -18,18 +18,19 @@ from sqlalchemy import text  # 스키마 생성 시 text 함수 필요
 from sqlmodel import SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession  # AsyncSession은 비동기용
 
+# 1. db_base에서 engine과 AsyncSessionLocal을 임포트합니다. (이전 코드는 삭제)
+# from app.core.database_base import engine, AsyncSessionLocal
+
 # 애플리케이션 설정을 임포트합니다.
 from app.core.config import settings
 
 # =============================================================================
-# 모든 도메인 모델 임포트
+# 모든 도메인 모델 임포트 -> 순환 import 때문에 main.py로 이동
 # =============================================================================
 # 이 부분이 매우 중요합니다. 모든 SQLModel 클래스가 SQLModel.metadata에 등록되도록
 # 명시적으로 임포트해야 합니다. 이렇게 해야 SQLAlchemy 매퍼가 모든 모델과
 # 그 관계를 인식하고 'configure_mappers()'가 올바르게 작동할 수 있습니다.
 # 이 임포트들은 각 모델 파일 내의 TYPE_CHECKING 블록과는 별개로 런타임에 필요합니다.
-
-
 import app.domains.shared.models
 import app.domains.usr.models
 import app.domains.loc.models
@@ -84,7 +85,7 @@ async def create_db_and_tables() -> None:
     print("DEBUG: 데이터베이스 스키마 생성을 시도합니다...")
     async with engine.begin() as conn:
         # 'app' 스키마를 'shared' 스키마로 변경
-        schemas_to_create = ['shared', 'usr', 'loc', 'ven', 'fms', 'inv', 'lims', 'ops']  # 'app' 대신 'shared'
+        schemas_to_create = ['shared', 'usr', 'loc', 'ven', 'fms', 'inv', 'lims', 'ops', 'corp', 'rpt']  # 'app' 대신 'shared'
         for schema_name in schemas_to_create:
             await conn.execute(text(f"CREATE SCHEMA IF NOT EXISTS {schema_name}"))
             print(f"  DEBUG: 스키마 '{schema_name}' 생성 완료 또는 이미 존재.")

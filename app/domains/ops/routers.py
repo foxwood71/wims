@@ -563,39 +563,3 @@ async def delete_ops_view(
 
     await ops_crud.ops_view.delete(db, id=view_id)
     return {}
-
-
-# ====================================================================
-# [추가] 범용 파일 업로드 라우터
-# ====================================================================
-@router.post(
-    "/files/",
-    response_model=FileRead,
-    status_code=201,
-    tags=["File Management"]
-)
-def upload_general_file(
-    *,
-    session: Session = Depends(get_session),
-    upload_file: UploadFile = File(...)
-):
-    """
-    엑셀, PDF 등 범용 파일을 업로드합니다.
-    """
-    #  파일 저장 위치를 'files' 디렉토리로 지정
-    saved_path = save_upload_file_to_static("files", upload_file)
-
-    file_size = upload_file.file.tell()
-
-    db_file = FileModel(
-        path=saved_path,
-        name=upload_file.filename,
-        content_type=upload_file.content_type,
-        size=file_size,
-    )
-
-    session.add(db_file)
-    session.commit()
-    session.refresh(db_file)
-
-    return db_file

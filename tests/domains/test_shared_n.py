@@ -9,23 +9,24 @@
   인증 및 권한 부여 로직을 검증합니다.
 """
 import os
-import tempfile
-import pytest
-import pytest_asyncio
-# from datetime import date
+import io
+import tempfile  # tempfile.TemporaryDirectory() 픽스처 사용 시 필요
 from pathlib import Path
+from datetime import datetime, UTC
+
+import pytest
+import pytest_asyncio  # @pytest.mark.asyncio 데코레이터 및 비동기 픽스처 사용 시 필요
+from sqlmodel import Session, select
 from fastapi.testclient import TestClient
-from sqlmodel import Session
 
 from app.core.config import settings
 from app.domains.usr import models as usr_models
 from app.domains.fms import models as fms_models
 from app.domains.inv import models as inv_models
+
 from app.domains.shared import models as shared_models
 from app.domains.shared import schemas as shared_schemas
-from app.domains.shared.crud import image_type as image_type_crud
-from app.domains.shared.crud import image as image_crud
-from app.domains.shared.crud import entity_image as entity_image_crud
+from app.domains.shared import crud as shared_crud
 
 
 @pytest.fixture(scope="module", autouse=True)
@@ -155,7 +156,7 @@ async def test_image_permissions_as_facility_manager(facility_manager_client: Te
     await db_session.refresh(equipment)
 
     link_data = shared_schemas.EntityImageCreate(image_id=image.id, entity_type="EQUIPMENT", entity_id=equipment.id)
-    await entity_image_crud.create(db_session, obj_in=link_data)
+    await shared_crud.entity_image.create(db_session, obj_in=link_data)
 
     response_update = await facility_manager_client.put(f"/api/v1/shared/images/{image.id}", json={"description": "Updated by facility manager"})
     assert response_update.status_code == 200
@@ -208,7 +209,7 @@ async def test_image_permissions_as_unauthorized_role(
 
     # 자재와 이미지를 연결
     link_data = shared_schemas.EntityImageCreate(image_id=material_image.id, entity_type="MATERIAL", entity_id=material.id)
-    await entity_image_crud.create(db_session, obj_in=link_data)
+    await shared_crud.entity_image.create(db_session, obj_in=link_data)
 
     # 설비 관리자가 자재 이미지 수정 시도 -> 실패
     response_fm_update = await facility_manager_client.put(f"/api/v1/shared/images/{material_image.id}", json={"description": "FM trying to update material image"})
@@ -264,17 +265,225 @@ async def test_set_main_image_and_delete_link(admin_client: TestClient, db_sessi
     """대표 이미지를 설정하고, 연결을 해제하는 것을 테스트합니다."""
     image1, image2, equipment = setup_for_entity_image_test
 
-    link1 = await entity_image_crud.create(db_session, obj_in=shared_schemas.EntityImageCreate(image_id=image1.id, entity_type="EQUIPMENT", entity_id=equipment.id))
-    link2 = await entity_image_crud.create(db_session, obj_in=shared_schemas.EntityImageCreate(image_id=image2.id, entity_type="EQUIPMENT", entity_id=equipment.id))
+    link1 = await shared_crud.entity_image.create(db_session, obj_in=shared_schemas.EntityImageCreate(image_id=image1.id, entity_type="EQUIPMENT", entity_id=equipment.id))
+    link2 = await shared_crud.entity_image.create(db_session, obj_in=shared_schemas.EntityImageCreate(image_id=image2.id, entity_type="EQUIPMENT", entity_id=equipment.id))
 
     await admin_client.put(f"/api/v1/shared/entity_images/{link1.id}/set_main?entity_type=EQUIPMENT&entity_id={equipment.id}")
     await admin_client.put(f"/api/v1/shared/entity_images/{link2.id}/set_main?entity_type=EQUIPMENT&entity_id={equipment.id}")
 
-    updated_link1_after = await entity_image_crud.get(db_session, id=link1.id)
-    updated_link2_after = await entity_image_crud.get(db_session, id=link2.id)
+    updated_link1_after = await shared_crud.entity_image.get(db_session, id=link1.id)
+    updated_link2_after = await shared_crud.entity_image.get(db_session, id=link2.id)
     assert updated_link1_after.is_main_image is False
     assert updated_link2_after.is_main_image is True
 
     await admin_client.delete(f"/api/v1/shared/entity_images/{link1.id}")
-    assert await entity_image_crud.get(db_session, id=link1.id) is None
-    assert await image_crud.get(db_session, id=image1.id) is not None
+    assert await shared_crud.entity_image.get(db_session, id=link1.id) is None
+    assert await shared_crud.image.get(db_session, id=image1.id) is not None
+
+
+# ==============================================================================
+# 이미지(Image) 및 엔티티-이미지(EntityImage) 관련 API 테스트
+# =============================================================================
+@pytest.mark.asyncio
+async def test_read_entity_images_for_entity_with_image_details(
+    admin_client: TestClient,          # 1. '관리자' 클라이언트 (테스트 환경 설정용)
+    authorized_client: TestClient,     # 2. '일반 사용자' 클라이언트 (주요 기능 테스트용)
+    db_session: Session,
+    test_user: usr_models.User,        # 3. '일반 사용자' 객체
+):
+    """
+    특정 엔티티에 연결된 이미지 조회 시, 이미지 상세 정보가 함께 반환되는지 테스트합니다.
+    """
+    # 단계 1: (관리자 권한으로) 테스트에 필요한 '이미지 유형' 미리 생성
+    image_type_create = {
+        "name": "설비사진",
+        "description": "설비의 외형 사진"
+    }
+    response = await admin_client.post(
+        "/api/v1/shared/image_types",
+        json=image_type_create
+    )
+    assert response.status_code == 201
+    image_type_id = response.json()["id"]
+
+    # 단계 2: (일반 사용자 권한으로) 이미지 레코드 생성 (DB 직접 추가)
+    dummy_file_name = "test_equipment_photo.jpg"
+    dummy_file_path = str(Path(settings.UPLOAD_DIR) / dummy_file_name)
+
+    with open(dummy_file_path, "wb") as f:
+        f.write(b"dummy image content")
+
+    image_create_data = shared_schemas.ImageCreate(
+        image_type_id=image_type_id,
+        file_name=dummy_file_name,
+        file_path=dummy_file_path,
+        file_size_kb=10,
+        mime_type="image/jpeg",
+        description="테스트 설비 사진",
+        uploaded_by_user_id=test_user.id,  # 일반 사용자의 ID를 사용
+        uploaded_at=datetime.now(UTC),
+        department_id=test_user.department_id
+    )
+    # SQLModel v2 호환성을 위해 from_orm 대신 model_validate 사용
+    db_image = shared_models.Image.model_validate(image_create_data)
+    db_session.add(db_image)
+    await db_session.commit()
+    await db_session.refresh(db_image)
+    image_id = db_image.id
+
+    # 단계 3: (일반 사용자 권한으로) 엔티티-이미지 연결 생성
+    entity_type = "EQUIPMENT"
+    entity_id = 999  # 가상의 설비 ID
+    entity_image_create = {
+        "image_id": str(image_id),  # JSON으로 보내기 위해 str로 변환
+        "entity_type": entity_type,
+        "entity_id": entity_id,
+        "is_main_image": True
+    }
+    response = await authorized_client.post(  # 일반 사용자 클라이언트로 호출
+        "/api/v1/shared/entity_images",
+        json=entity_image_create
+    )
+    assert response.status_code == 201
+
+    # 단계 4: (권한 없이 또는 일반 사용자 권한으로) 설비에 연결된 이미지 정보 조회
+    response = await authorized_client.get(
+        f"/api/v1/shared/entity_images/by_entity/{entity_type}/{entity_id}"
+    )
+    assert response.status_code == 200
+    linked_images = response.json()
+
+    # --- 이하 검증 로직은 동일 ---
+    assert len(linked_images) == 1
+    linked_image_data = linked_images[0]
+
+    assert linked_image_data["image_id"] == image_id
+    assert "image" in linked_image_data
+    assert linked_image_data["image"] is not None
+
+    assert linked_image_data["image"]["id"] == image_id
+    assert linked_image_data["image"]["file_name"] == dummy_file_name
+    assert linked_image_data["image"]["file_path"] == dummy_file_path
+    assert linked_image_data["image"]["mime_type"] == "image/jpeg"
+    assert linked_image_data["image"]["file_size_kb"] == 10
+    assert linked_image_data["image"]["description"] == "테스트 설비 사진"
+    assert linked_image_data["image"]["uploaded_by_user_id"] == test_user.id
+
+
+# ==============================================================================
+# 파일(File) 관련 API 테스트 (여기에 추가)
+# ==============================================================================
+@pytest.mark.asyncio
+async def test_upload_file_success(
+    authorized_client: TestClient,
+    db_session: Session,
+    test_user: usr_models.User
+):
+    """
+    일반 사용자가 파일을 성공적으로 업로드하는지 테스트합니다.
+    """
+    # 단계 1: 테스트용 더미 파일 준비
+    dummy_file_name = "test_upload.txt"
+    dummy_content = b"This is a test file for WIMS."
+    file_data = {"upload_file": (dummy_file_name, io.BytesIO(dummy_content), "text/plain")}
+
+    # 단계 2: 파일 업로드 API 호출
+    response = await authorized_client.post("/api/v1/shared/files/upload", files=file_data)
+
+    # 단계 3: 응답 검증
+    assert response.status_code == 201, f"응답 실패: {response.text}"
+    response_data = response.json()
+
+    assert "id" in response_data
+    assert "url" in response_data
+    assert response_data["message"] == "File uploaded successfully."
+
+    # 단계 4: 데이터베이스에 파일 레코드가 생성되었는지 확인
+    file_id = response_data["id"]
+    statement = select(shared_models.File).where(shared_models.File.id == file_id)
+    result = await db_session.execute(statement)
+    db_file = result.scalar_one_or_none()
+
+    assert db_file is not None
+    assert db_file.name == dummy_file_name
+    assert db_file.content_type == "text/plain"
+    assert db_file.size == len(dummy_content)
+    assert db_file.uploaded_by_user_id == test_user.id
+
+    # 단계 5: 실제 파일 시스템에 파일이 생성되었는지 확인
+    expected_path = Path(settings.UPLOAD_DIR) / db_file.path
+    assert expected_path.exists()
+    assert expected_path.read_bytes() == dummy_content
+
+    print(f"\n테스트 성공: 파일 '{dummy_file_name}'이 성공적으로 업로드 되었습니다.")
+
+
+@pytest.mark.asyncio
+async def test_download_file_success(authorized_client: TestClient):
+    """
+    업로드된 파일을 성공적으로 다운로드하는지 테스트합니다.
+    """
+    # 단계 1: 테스트용 파일 업로드
+    dummy_file_name = "download_test.log"
+    dummy_content = b"Log file content for download test."
+    file_data = {"upload_file": (dummy_file_name, io.BytesIO(dummy_content), "text/x-log")}
+
+    upload_response = await authorized_client.post("/api/v1/shared/files/upload", files=file_data)
+    assert upload_response.status_code == 201
+    file_id = upload_response.json()["id"]
+
+    # 단계 2: 파일 다운로드 API 호출
+    download_response = await authorized_client.get(f"/api/v1/shared/files/download/{file_id}")
+
+    # 단계 3: 응답 검증
+    assert download_response.status_code == 200
+    assert download_response.content == dummy_content
+    assert "attachment" in download_response.headers["content-disposition"]
+    assert f'filename="{dummy_file_name}"' in download_response.headers["content-disposition"]
+
+    print(f"\n테스트 성공: 파일 '{dummy_file_name}'을 성공적으로 다운로드했습니다.")
+
+
+@pytest.mark.asyncio
+async def test_download_non_existent_file(authorized_client: TestClient):
+    """
+    존재하지 않는 파일을 다운로드 시 404 에러를 반환하는지 테스트합니다.
+    """
+    non_existent_id = 999999999
+    response = await authorized_client.get(f"/api/v1/shared/files/download/{non_existent_id}")
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "File not found."
+
+    print("\n테스트 성공: 존재하지 않는 파일 다운로드 시 404 에러를 올바르게 반환합니다.")
+
+
+@pytest.mark.asyncio
+async def test_read_file_metadata_success(authorized_client: TestClient):
+    """
+    업로드된 파일의 메타데이터를 성공적으로 조회하는지 테스트합니다.
+    """
+    # 단계 1: 테스트용 파일 업로드
+    dummy_file_name = "metadata_test.json"
+    dummy_content = b'{"key": "value"}'
+    file_data = {"upload_file": (dummy_file_name, io.BytesIO(dummy_content), "application/json")}
+
+    upload_response = await authorized_client.post("/api/v1/shared/files/upload", files=file_data)
+    assert upload_response.status_code == 201
+    file_id = upload_response.json()["id"]
+
+    # 단계 2: 파일 메타데이터 조회 API 호출
+    metadata_response = await authorized_client.get(f"/api/v1/shared/files/{file_id}")
+
+    # 단계 3: 응답 검증
+    assert metadata_response.status_code == 200
+    metadata = metadata_response.json()
+
+    assert metadata["id"] == file_id
+    assert metadata["name"] == dummy_file_name
+    assert metadata["content_type"] == "application/json"
+    assert metadata["size"] == len(dummy_content)
+    assert "url" in metadata
+    assert "created_at" in metadata
+
+    print(f"\n테스트 성공: 파일 '{dummy_file_name}'의 메타데이터를 성공적으로 조회했습니다.")

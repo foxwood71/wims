@@ -21,8 +21,7 @@ FastAPI 애플리케이션의 'corp' 도메인 패키지입니다.
 """
 
 # __flake8: noqa -> 해당 파일 전체
-
-from . import models, schemas, router  # noqa: F401
+# from . import models, schemas, router  # noqa: F401
 
 # 패키지 메타데이터
 __title__ = "WIMS Corporation Info Domain"

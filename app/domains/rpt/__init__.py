@@ -17,10 +17,13 @@ FastAPI 애플리케이션의 'rpt' (Report) 도메인 패키지입니다.
 """
 
 
-from . import models, schemas, router, crud  # noqa: F401
-
-# 패키지 메타데이터
+# from . import models, schemas, router, crud  # noqa: F401
+# 패키지 메타데이터 (선택 사항)
 __title__ = "WIMS Report Domain"
 __description__ = "Manages report form metadata, linking to actual template files in the shared domain."
-__version__ = "0.1.0"
-__all__ = ["models", "schemas", "router", "crud"]
+__version__ = "0.1.0"  # shared 도메인 패키지의 버전
+__all__ = []  # 'from app.domains.shared import *' 시 내보낼 이름 목록. 일반적으로 비워둡니다.
+
+# (선택 사항) 이 패키지에서 다른 패키지로 공통 모델을 노출할 수 있습니다.
+# 예를 들어, 다른 도메인에서 `Image` 모델을 자주 사용한다면 여기서 노출할 수 있습니다.
+# from .models import Image, ImageType, EntityImage, Version
