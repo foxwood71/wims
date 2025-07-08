@@ -7,6 +7,7 @@ SQLModel과 SQLAlchemy를 사용하여 데이터베이스와 상호작용합니�
 
 import logging
 from typing import Any, Dict, Generic, List, Type, TypeVar, Union
+from decimal import Decimal
 
 from pydantic import BaseModel
 from sqlalchemy.future import select
@@ -47,9 +48,10 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         self, db: AsyncSession, *, skip: int = 0, limit: int = 100
     ) -> List[ModelType]:
         """여러 객체를 조회합니다."""
-        query = select(self.model).offset(skip).limit(limit)
-        result = await db.execute(query)
-        return result.scalars().all()
+        materials_result = await db.execute(
+            select(self.model).offset(skip).limit(limit)
+        )
+        return materials_result.scalars().all()
 
     async def create(
         self, db: AsyncSession, *, obj_in: CreateSchemaType
@@ -139,7 +141,7 @@ class MaterialSpecDefinitionCRUD(
         """
         스펙 정의를 업데이트합니다.
         스펙 이름(name)이 변경되면, 관련된 모든 자재의 스펙 키도
-        백그라운드 작업을 통해 업데이트합니다.
+        백그라운드 작업(또는 동기 작업)으로 업데이트합니다.
         """
         old_name = db_obj.name
         update_data = (
@@ -152,9 +154,8 @@ class MaterialSpecDefinitionCRUD(
         updated_obj = await super().update(db, db_obj=db_obj, obj_in=update_data)
 
         if new_name and old_name != new_name:
-            key_unit = db_obj.unit.lower() if db_obj.unit else "value"
-            old_key = f"{old_name.lower().replace(' ', '_')}_{key_unit}"
-            new_key = f"{new_name.lower().replace(' ', '_')}_{key_unit}"
+            old_key = old_name.lower().replace(' ', '_')
+            new_key = new_name.lower().replace(' ', '_')
 
             if arq_redis_pool:
                 await arq_redis_pool.enqueue_job(
@@ -164,9 +165,12 @@ class MaterialSpecDefinitionCRUD(
                     new_key,
                 )
             else:
-                logger.warning(
+                logger.info(
                     "ARQ Redis pool not available, "
-                    "skipping background task for spec key update."
+                    "performing spec key update synchronously."
+                )
+                await inv_tasks.update_spec_key_for_all_materials(
+                    {"db": db}, db_obj.id, old_key, new_key
                 )
         return updated_obj
 
@@ -182,12 +186,7 @@ class MaterialSpecDefinitionCRUD(
         if not spec_def_to_delete:
             return None
 
-        key_unit = (
-            spec_def_to_delete.unit.lower() if spec_def_to_delete.unit else "value"
-        )
-        spec_key_to_remove = (
-            f"{spec_def_to_delete.name.lower().replace(' ', '_')}_{key_unit}"
-        )
+        spec_key_to_remove = spec_def_to_delete.name
 
         if arq_redis_pool:
             await arq_redis_pool.enqueue_job(
@@ -228,15 +227,13 @@ class MaterialCategorySpecDefinitionCRUD(
         result = await db.execute(query)
         return result.scalar_one_or_none()
 
-    # --- 👇 여기가 핵심 수정 부분입니다! ---
     async def generate_spec_key(
         self, spec_def: inv_models.MaterialSpecDefinition
     ) -> str:
         """
         스펙 정의 객체로부터 JSON 키를 생성합니다.
-        'name' 필드가 이미 '이름_단위' 형식의 완전한 키라고 가정합니다.
+        'name' 필드가 이미 완전한 키라고 가정합니다.
         """
-        #  name 필드를 그대로 사용하고, 공백만 '_'로 바꿉니다.
         return spec_def.name.lower().replace(' ', '_')
 
     async def create(
@@ -295,7 +292,7 @@ class MaterialCategorySpecDefinitionCRUD(
         """
         카테고리와 스펙 정의의 연결을 해제합니다.
         연결 해제 후, 관련된 모든 자재의 스펙에서 해당 키를
-        백그라운드 작업으로 삭제합니다.
+        백그라운드 작업(또는 동기 작업)으로 삭제합니다.
         """
         link_to_delete = await self.get_by_link(
             db,
@@ -308,7 +305,6 @@ class MaterialCategorySpecDefinitionCRUD(
         spec_def = await db.get(inv_models.MaterialSpecDefinition, spec_definition_id)
         spec_key_to_remove = await self.generate_spec_key(spec_def)
 
-        #  Redis 유무에 따라 동기/비동기 작업을 분기합니다.
         if arq_redis_pool:
             await arq_redis_pool.enqueue_job(
                 "remove_spec_key_from_materials_in_category",
@@ -321,7 +317,6 @@ class MaterialCategorySpecDefinitionCRUD(
                 "Performing spec key removal synchronously for category %d.",
                 material_category_id,
             )
-            #  존재하는 태스크 함수를 직접 호출합니다.
             await inv_tasks.remove_spec_key_from_materials_in_category(
                 {"db": db}, material_category_id, spec_key_to_remove
             )
@@ -372,7 +367,9 @@ class MaterialCRUD(
         if spec_definitions:
             for spec_def in spec_definitions:
                 spec_key = (
-                    await material_category_spec_definition.generate_spec_key(spec_def)
+                    await material_category_spec_definition.generate_spec_key(
+                        spec_def
+                    )
                 )
                 initial_specs[spec_key] = None
 
@@ -419,8 +416,6 @@ class MaterialSpecCRUD(
             for spec_def in spec_definitions
         }
 
-        # input_keys = set(specs.keys())
-        #  null 값을 보내는 경우는 키 삭제를 의미하므로 유효성 검사에서 제외
         keys_to_validate = {k for k, v in specs.items() if v is not None}
 
         if not keys_to_validate.issubset(valid_keys):
@@ -467,10 +462,8 @@ class MaterialSpecCRUD(
 
         for key, value in obj_in.specs.items():
             if value is None:
-                #  값이 null이면 해당 키를 삭제
                 updated_specs.pop(key, None)
             else:
-                #  값이 있으면 업데이트 또는 추가
                 updated_specs[key] = value
 
         db_obj.specs = updated_specs
@@ -494,7 +487,7 @@ class MaterialBatchCRUD(
         self, db: AsyncSession, *, batch_number: str
     ) -> inv_models.MaterialBatch | None:
         """배치 번호로 객체를 조회합니다."""
-        query = select(self.model).where(self.model.batch_number == batch_number)
+        query = select(self.model).where(self.model.lot_number == batch_number)
         result = await db.execute(query)
         return result.scalar_one_or_none()
 
@@ -506,39 +499,114 @@ class MaterialTransactionCRUD(
         inv_schemas.MaterialTransactionUpdate,
     ]
 ):
-    """MaterialTransaction 모델에 특화된 CRUD 작업을 처리합니다."""
+    """
+    MaterialTransaction 모델에 특화된 CRUD 작업을 처리합니다.
+    거래 유형에 따라 다른 비즈니스 로직을 수행합니다.
+    """
 
     async def create(
         self, db: AsyncSession, *, obj_in: inv_schemas.MaterialTransactionCreate
+    ) -> Union[inv_models.MaterialTransaction, List[inv_models.MaterialTransaction]]:
+        """
+        새로운 자재 거래를 생성합니다.
+        - USAGE: FIFO 로직에 따라 재고를 차감합니다.
+        - PURCHASE: 새로운 배치를 생성하고 재고를 추가합니다.
+        """
+        if obj_in.transaction_type == "USAGE":
+            return await self._create_usage_transaction(db, obj_in)
+        elif obj_in.transaction_type == "PURCHASE":
+            return await self._create_purchase_transaction(db, obj_in)
+        else:
+            raise NotImplementedError(
+                f"Transaction type '{obj_in.transaction_type}' is not implemented."
+            )
+
+    async def _create_purchase_transaction(
+        self, db: AsyncSession, obj_in: inv_schemas.MaterialTransactionCreate
     ) -> inv_models.MaterialTransaction:
-        """
-        새로운 자재 거래를 생성하고, 관련된 자재 배치의 재고 수량을 업데이트합니다.
-        """
-        transaction = self.model.model_validate(obj_in)
+        """구매(입고) 거래를 처리하고 새 배치를 생성합니다."""
+        if obj_in.quantity_change <= 0:
+            raise HTTPException(status_code=400, detail="Purchase quantity must be positive.")
+
+        new_batch = inv_models.MaterialBatch(
+            material_id=obj_in.material_id,
+            facility_id=obj_in.facility_id,
+            vendor_id=obj_in.vendor_id,
+            quantity=Decimal(str(obj_in.quantity_change)),
+            unit_cost=Decimal(str(obj_in.unit_price)),
+            received_date=obj_in.transaction_date,
+        )
+        db.add(new_batch)
+        await db.flush()
+        await db.refresh(new_batch)
+
+        transaction = inv_models.MaterialTransaction.model_validate(
+            obj_in, update={'source_batch_id': new_batch.id}
+        )
         db.add(transaction)
-
-        batch = await db.get(inv_models.MaterialBatch, obj_in.material_batch_id)
-        if not batch:
-            await db.rollback()
-            raise ValueError("Material batch not found")
-
-        if obj_in.transaction_type == "IN":
-            batch.quantity_on_hand += obj_in.quantity
-        elif obj_in.transaction_type == "OUT":
-            if batch.quantity_on_hand < obj_in.quantity:
-                await db.rollback()
-                raise ValueError("Insufficient quantity on hand for this transaction.")
-            batch.quantity_on_hand -= obj_in.quantity
-
-        db.add(batch)
         await db.commit()
         await db.refresh(transaction)
         return transaction
 
+    async def _create_usage_transaction(
+        self, db: AsyncSession, obj_in: inv_schemas.MaterialTransactionCreate
+    ) -> List[inv_models.MaterialTransaction]:
+        """자재 사용 거래를 FIFO 로직에 따라 처리합니다."""
+        if obj_in.quantity_change >= 0:
+            raise HTTPException(status_code=400, detail="Usage quantity must be negative.")
+
+        usage_needed = abs(Decimal(str(obj_in.quantity_change)))
+
+        query = (
+            select(inv_models.MaterialBatch)
+            .where(inv_models.MaterialBatch.material_id == obj_in.material_id)
+            .where(inv_models.MaterialBatch.facility_id == obj_in.facility_id)
+            .where(inv_models.MaterialBatch.quantity > 0)
+            .order_by(inv_models.MaterialBatch.received_date.asc())
+        )
+        result = await db.execute(query)
+        batches = result.scalars().all()
+
+        current_stock = sum(batch.quantity for batch in batches)
+        if current_stock < usage_needed:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Insufficient stock. Required: {usage_needed}, "
+                       f"Available: {current_stock}"
+            )
+
+        transactions_created = []
+        for batch in batches:
+            if usage_needed <= 0:
+                break
+
+            usage_from_batch = min(batch.quantity, usage_needed)
+            batch.quantity -= usage_from_batch
+
+            transaction_data = obj_in.model_dump()
+            transaction_data['quantity_change'] = -usage_from_batch
+            transaction_data['source_batch_id'] = batch.id
+
+            transaction = inv_models.MaterialTransaction.model_validate(transaction_data)
+
+            db.add(batch)
+            db.add(transaction)
+            transactions_created.append(transaction)
+
+            usage_needed -= usage_from_batch
+
+        await db.commit()
+        for t in transactions_created:
+            await db.refresh(t)
+
+        return transactions_created
+
 
 #  각 CRUD 클래스의 인스턴스 생성
 material_category = MaterialCategoryCRUD(inv_models.MaterialCategory)
-material_spec_definition = MaterialSpecDefinitionCRUD(inv_models.MaterialSpecDefinition)
+material_spec_definition = MaterialSpecDefinitionCRUD(
+    inv_models.MaterialSpecDefinition
+)
 material_category_spec_definition = MaterialCategorySpecDefinitionCRUD(
     inv_models.MaterialCategorySpecDefinition
 )

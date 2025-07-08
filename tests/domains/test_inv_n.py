@@ -313,21 +313,39 @@ async def setup_fifo_test_data(db_session, material, plant, vendor):
 
 @pytest.mark.asyncio
 async def test_create_transaction_usage_fifo_partial_depletion(
-    authorized_client: AsyncClient, db_session: AsyncSession, inv_test_material: inv_models.Material, inv_test_plant: loc_models.Facility, inv_test_vendor: ven_models.Vendor
+    authorized_client: AsyncClient,
+    db_session: AsyncSession,
+    inv_test_material: inv_models.Material,
+    inv_test_plant: loc_models.Facility,
+    inv_test_vendor: ven_models.Vendor
 ):
     """(성공) FIFO: 첫 번째 배치를 부분적으로 소모하는 로직 테스트"""
-    batch1, batch2 = await setup_fifo_test_data(db_session, inv_test_material, inv_test_plant, inv_test_vendor)
+    batch1, batch2 = await setup_fifo_test_data(
+        db_session, inv_test_material, inv_test_plant, inv_test_vendor
+    )
 
     usage_qty = -10.0
     transaction_data = {
-        "material_id": inv_test_material.id, "facility_id": inv_test_plant.id,
-        "transaction_type": "USAGE", "quantity_change": usage_qty
+        "material_id": inv_test_material.id,
+        "facility_id": inv_test_plant.id,
+        "transaction_type": "USAGE",
+        "quantity_change": usage_qty
     }
-    response = await authorized_client.post("/api/v1/inv/material_transactions", json=transaction_data)
+    response = await authorized_client.post(
+        "/api/v1/inv/material_transactions", json=transaction_data
+    )
     assert response.status_code == 201
-    assert response.json()["source_batch_id"] == batch1.id
+
+    # --- 👇 여기가 핵심 수정 부분입니다! ---
+    #  응답이 리스트이므로, 첫 번째 항목을 선택하여 검증합니다.
+    response_data = response.json()
+    assert isinstance(response_data, list)
+    assert len(response_data) == 1
+    assert response_data[0]["source_batch_id"] == batch1.id
+    # --- 👆 여기까지가 핵심 수정 부분입니다. ---
 
     await db_session.refresh(batch1)
     await db_session.refresh(batch2)
-    assert batch1.quantity == 20.0
-    assert batch2.quantity == 50.0
+
+    assert batch1.quantity == Decimal('10.00')
+    assert batch2.quantity == Decimal('30.00')

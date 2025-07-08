@@ -5,7 +5,7 @@
 """
 
 from typing import Optional, Dict, Any  # List,
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 from pydantic import Field  # BaseModel,
 from sqlmodel import SQLModel
 
@@ -214,11 +214,15 @@ class MaterialBatchResponse(MaterialBatchBase):
 # 7. inv.material_transactions 테이블 스키마
 # =============================================================================
 class MaterialTransactionBase(SQLModel):
+    """자재 거래(입출고)의 기본 스키마"""
     material_id: int = Field(..., description="관련 자재 품목 ID (FK)")
     facility_id: int = Field(..., description="거래 발생 처리장 ID (FK)")
     transaction_type: str = Field(..., max_length=50, description="거래 유형 (PURCHASE, USAGE, RETURN, ADJUSTMENT)")
     quantity_change: float = Field(..., description="수량 변경 (양수: 입고, 음수: 출고/사용)")
-    transaction_date: Optional[datetime] = Field(None, description="거래 발생 일시 (지정하지 않으면 현재 시각)")
+    transaction_date: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc),
+        description="거래 발생 일시 (지정하지 않으면 현재 시각)"
+    )
     related_equipment_id: Optional[int] = Field(None, description="관련 설비 ID (FK)")
     related_equipment_history_id: Optional[int] = Field(None, description="관련 설비 이력 ID (FK)")
     source_batch_id: Optional[int] = Field(None, description="사용된 배치 ID (FK)")

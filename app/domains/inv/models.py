@@ -7,6 +7,7 @@
 
 from typing import Optional, List, Dict, Any, TYPE_CHECKING
 from datetime import datetime, date, UTC
+from decimal import Decimal
 from sqlmodel import Field, Relationship, SQLModel, Column
 from sqlalchemy import Numeric
 from sqlalchemy.dialects.postgresql import JSONB
@@ -222,7 +223,7 @@ class MaterialBatchBase(SQLModel):
     facility_id: int = Field(foreign_key="loc.facilities.id")
     storage_location_id: Optional[int] = Field(default=None, foreign_key="loc.locations.id")
     lot_number: Optional[str] = Field(default=None, max_length=100)
-    quantity: float = Field(sa_column=Column(Numeric(18, 2)))
+    quantity: Decimal = Field(sa_column=Column(Numeric(18, 2)))
     unit_cost: Optional[float] = Field(default=None, sa_column=Column(Numeric(18, 2)))
     # [수정] received_date 필드에 sa_column을 추가하여 타임존을 명시적으로 처리합니다.
     received_date: Optional[datetime] = Field(
