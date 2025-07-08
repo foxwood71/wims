@@ -4,9 +4,9 @@
 'inv' 도메인 (PostgreSQL 'inv' 스키마)의 Pydantic 스키마를 정의하는 모듈입니다.
 """
 
-from typing import Optional, List, Dict, Any
+from typing import Optional, Dict, Any  # List,
 from datetime import datetime, date
-from pydantic import BaseModel, Field
+from pydantic import Field  # BaseModel,
 from sqlmodel import SQLModel
 
 
@@ -92,6 +92,14 @@ class MaterialCategorySpecDefinitionResponse(MaterialCategorySpecDefinitionBase)
 
     class Config:
         from_attributes = True
+
+
+class MaterialCategorySpecDefinitionUpdate(MaterialCategorySpecDefinitionCreate):
+    """
+    자재 카테고리와 스펙 정의의 연결 관계를 업데이트하기 위한 스키마입니다.
+    현재로서는 특별한 업데이트 로직이 없으므로 Create 스키마를 상속합니다.
+    """
+    pass
 
 
 # =============================================================================

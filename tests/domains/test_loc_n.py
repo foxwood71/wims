@@ -409,7 +409,7 @@ async def test_delete_facility_restrict_by_location(admin_client: TestClient, db
     print(f"Response status code: {response.status_code}")
 
     assert response.status_code == 400
-    assert response.json()["detail"] == "Cannot delete facility because there are associated locations."
+    assert response.json()["detail"] == "Cannot delete this facility as it has associated locations."
 
     # 데이터베이스에서 실제로 삭제되지 않았는지 확인
     assert await loc_crud.facility.get(db_session, id=facility.id) is not None
@@ -446,7 +446,7 @@ async def test_delete_facility_restrict_by_equipment(admin_client: TestClient, d
     print(f"Response JSON: {response.json()}")
 
     assert response.status_code == 400
-    assert response.json()["detail"] == "Cannot delete facility because there are associated equipments."
+    assert response.json()["detail"] == "Cannot delete this facility as it has associated equipment."
     assert await loc_crud.facility.get(db_session, id=facility.id) is not None
     print("test_delete_facility_restrict_by_equipment passed.")
 
@@ -738,7 +738,7 @@ async def test_delete_location_type_restrict_by_location(
     print(f"Response status code: {response.status_code}")
 
     assert response.status_code == 400
-    assert response.json()["detail"] == "Cannot delete location type due to existing related data."
+    assert response.json()["detail"] == "Cannot delete this location type as it is currently in use by locations."
 
     # 데이터베이스에서 실제로 삭제되지 않았는지 확인
     # 이제 db_session은 라우터가 사용하는 세션과 동일하므로, 직접 조회 가능.

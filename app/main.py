@@ -8,18 +8,20 @@ from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-
 # 핵심 설정 및 데이터베이스 모듈 임포트 (경로 변경 반영)
 from app.core.config import settings  # noqa: F401
 from app.core.database import engine, get_session
-
 
 # 각 도메인의 라우터들을 임포트합니다.
 # 모든 도메인이 'app/domains' 하위 폴더에 있으므로, 경로를 정확히 지정합니다.
 from app import API_PREFIX
 
 # 태스크 모듈 임포트
-from app.tasks import lims_tasks, fms_tasks, inv_tasks, shared_tasks, general_tasks
+from app.core import tasks as core_tasks
+from app.domains.shared import tasks as shared_tasks
+from app.domains.inv import tasks as inv_tasks
+from app.domains.fms import tasks as fms_tasks
+from app.domains.lims import tasks as lims_tasks
 
 # 기타 라우터 임포트 (기존 코드 유지)
 from app.domains.shared.routers import router as shared_router
@@ -35,15 +37,15 @@ from app.domains.rpt.routers import router as rpt_router
 
 # ARQ 워커가 실행할 태스크 함수 목록
 worker_functions = [
+    core_tasks.health_check_database_task,
+    shared_tasks.cleanup_unused_images_task,
+    inv_tasks.change_spec_key_from_materials_in_category,
+    inv_tasks.remove_spec_key_from_materials_in_category,
+    inv_tasks.add_spec_to_materials_in_category,
+    fms_tasks.sync_equipment_specs_on_spec_definition_name_change,  # change_spec_key_from_materials_in_category
+    fms_tasks.sync_equipment_specs_on_spec_definition_delete,  # remove_spec_key_from_materials_in_category
     lims_tasks.sync_worksheet_item_code_change,
     lims_tasks.add_new_item_to_worksheet_data,
-    fms_tasks.sync_equipment_specs_on_spec_definition_name_change,
-    fms_tasks.sync_equipment_specs_on_spec_definition_delete,
-    inv_tasks.sync_material_specs_on_spec_definition_name_change,
-    inv_tasks.sync_material_specs_on_spec_definition_delete,
-    inv_tasks.add_spec_to_materials_in_category_task,
-    shared_tasks.cleanup_unused_images_task,
-    general_tasks.health_check_database_task,
 ]
 
 
@@ -55,14 +57,14 @@ class ArqWorkerSettings:
     jobs = [
         {
             'name': 'daily_db_health_check',
-            'function': 'app.tasks.general_tasks.health_check_database_task',
+            'function': 'app.core.tasks.health_check_database_task',
             'cron': '0 0 * * *',
             'timeout': 300,
             'keep_result': 600,
         },
         {
             'name': 'daily_unused_image_cleanup',  # 작업의 고유 이름
-            'function': 'app.tasks.shared_tasks.cleanup_unused_images_task',  # 실행할 태스크 함수의 전체 경로
+            'function': 'app.domains.shared.tasks.cleanup_unused_images_task',  # 실행할 태스크 함수의 전체 경로
             'cron': '0 1 * * *',  # 매일 새벽 1시(01:00)에 실행 (분 시 일 월 요일)
             'timeout': 1800,  # 30분 (필요에 따라 조절)
             'keep_result': 3600,  # 1시간 동안 결과 유지

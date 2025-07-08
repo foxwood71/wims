@@ -11,7 +11,8 @@ from decimal import Decimal
 from datetime import date, datetime, timedelta, UTC
 
 #  테스트 대상 및 의존성 임포트
-from app.domains.inv import models as inv_models, crud as inv_crud
+from app.domains.inv import models as inv_models
+from app.domains.inv import crud as inv_crud
 from app.domains.loc import models as loc_models
 from app.domains.usr import models as usr_models
 from app.domains.ven import models as ven_models

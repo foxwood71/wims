@@ -1,13 +1,17 @@
 # app/tasks/inv_tasks.py
 
-import json
-from typing import List
+# import json
+from typing import Any, Dict, List
+
 from sqlalchemy.sql import text
+from sqlmodel import select
+from sqlmodel.ext.asyncio.session import AsyncSession
+
 from app.core.database import get_async_session_context
 from app.domains.inv import models as inv_models
 
 
-async def sync_material_specs_on_spec_definition_name_change(
+async def change_spec_key_from_materials_in_category(
     ctx,  # ARQ context
     spec_definition_id: int,
     old_spec_name: str,
@@ -56,7 +60,7 @@ async def sync_material_specs_on_spec_definition_name_change(
     return {"status": "success", "updated_count": updated_count}
 
 
-async def sync_material_specs_on_spec_definition_delete(
+async def remove_spec_key_from_materials_in_category(
     ctx,  # ARQ context
     spec_definition_id: int,
     spec_name_to_remove: str,
@@ -104,67 +108,59 @@ async def sync_material_specs_on_spec_definition_delete(
 
 
 async def add_spec_to_materials_in_category(
-    ctx,  # ARQ context
-    material_category_id: int,
-    new_spec_name: str
-):
+    ctx: Dict[str, Any], category_id: int, spec_key: str
+) -> Dict[str, Any]:
     """
-    MaterialCategory에 새로운 MaterialSpecDefinition이 연결되었을 때,
-    해당 카테고리에 속한 모든 Material의 MaterialSpec에 새로운 스펙 필드를 null 값으로 추가하는 백그라운드 작업.
+    특정 카테고리에 속한 모든 자재에 대해, 새로운 스펙 키를 추가하거나 업데이트합니다.
     """
-    print(f"백그라운드 작업 시작: 카테고리 ID {material_category_id}에 새 스펙 '{new_spec_name}' 추가 동기화")
+    db: AsyncSession = ctx['db']
+    print(
+        f"백그라운드 작업 시작: 카테고리 ID {category_id}에 "
+        f"새 스펙 '{spec_key}' 추가 동기화"
+    )
 
-    updated_count = 0
-    async with get_async_session_context() as db:
-        try:
-            #  1. 해당 카테고리에 속한 모든 자재 (Material)를 조회합니다.
-            #     MaterialSpec이 없는 자재도 포함하기 위해 LEFT JOIN 또는 서브쿼리 사용
-            #     여기서는 Material을 조회하여 MaterialSpec이 없으면 새로 생성하도록 구현
-            materials_to_update_stmt = text("""
-                SELECT
-                    m.id AS material_id,
-                    ms.id AS material_spec_id,
-                    ms.specs AS current_specs
-                FROM inv.materials AS m
-                LEFT JOIN inv.materials_specs AS ms ON m.id = ms.materials_id
-                WHERE m.material_category_id = :material_category_id;
-            """)
+    #  1. 카테고리에 속한 모든 자재를 조회합니다.
+    material_query = select(inv_models.Material).where(
+        inv_models.Material.material_category_id == category_id
+    )
+    material_rs = await db.execute(material_query)
+    materials = material_rs.scalars().all()
 
-            result = await db.execute(
-                materials_to_update_stmt,
-                {"material_category_id": material_category_id}
+    if not materials:
+        print("작업 완료! 스펙을 추가할 자재가 없습니다.")
+        return {"status": "ok", "updated_count": 0}
+
+    material_ids = [m.id for m in materials]
+
+    #  2. 해당 자재들의 기존 스펙 정보를 한 번에 가져옵니다.
+    spec_query = select(inv_models.MaterialSpec).where(
+        inv_models.MaterialSpec.materials_id.in_(material_ids)
+    )
+    #  자재 ID를 키로 하는 딕셔너리로 만들어 쉽게 접근합니다.
+    specs_rs = await db.execute(spec_query)
+    specs_map = {spec.materials_id: spec for spec in specs_rs.scalars().all()}
+
+    update_count = 0
+    #  3. 각 자재에 대해 스펙을 업데이트하거나 새로 생성합니다.
+    for material_id in material_ids:
+        if material_id in specs_map:
+            #  기존 스펙이 있으면, specs JSON에 키만 추가합니다.
+            spec = specs_map[material_id]
+            if spec_key not in spec.specs:
+                new_specs = spec.specs.copy()
+                new_specs[spec_key] = None
+                spec.specs = new_specs  # SQLAlchemy가 변경을 감지하도록 재할당
+                db.add(spec)
+                update_count += 1
+        else:
+            #  기존 스펙이 없으면, 새로 생성합니다.
+            new_spec = inv_models.MaterialSpec(
+                materials_id=material_id,
+                specs={spec_key: None}
             )
-            rows = result.fetchall()
+            db.add(new_spec)
+            update_count += 1
 
-            for row in rows:
-                material_id = row.material_id
-                material_spec_id = row.material_spec_id
-                current_specs = row.current_specs if row.current_specs else {}
-
-                if new_spec_name not in current_specs:
-                    updated_count += 1
-                    if material_spec_id is None:
-                        #  MaterialSpec이 없으면 새로 생성 (JSONB 필드 사용)
-                        insert_query = text("""
-                            INSERT INTO inv.materials_specs (materials_id, specs)
-                            VALUES (:material_id, jsonb_build_object(:new_spec_name, NULL));
-                        """)
-                        await db.execute(insert_query, {"material_id": material_id, "new_spec_name": new_spec_name})
-                    else:
-                        #  기존 MaterialSpec에 새 필드 추가
-                        update_query = text("""
-                            UPDATE inv.materials_specs
-                            SET specs = specs || jsonb_build_object(:new_spec_name, NULL)
-                            WHERE id = :material_spec_id;
-                        """)
-                        await db.execute(update_query, {"material_spec_id": material_spec_id, "new_spec_name": new_spec_name})
-
-            await db.commit()
-
-        except Exception as e:
-            await db.rollback()
-            print(f"백그라운드 자재 스펙 추가 동기화 실패: {e}")
-            return {"status": "error", "message": str(e)}
-
-    print(f"작업 완료! 총 {updated_count}개의 MaterialSpec 데이터에 새 항목 키 추가됨.")
-    return {"status": "success", "updated_count": updated_count}
+    await db.commit()
+    print(f"작업 완료! 총 {update_count}개의 MaterialSpec 데이터에 새 항목 키 추가됨.")
+    return {"status": "ok", "updated_count": update_count}

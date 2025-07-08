@@ -26,10 +26,10 @@ from app.domains.fms import models as fms_models  # fms_models 임포트 추가 
 # INV 도메인의 CRUD, 모델, 스키마
 from app.domains.inv import models as inv_models
 from app.domains.inv import schemas as inv_schemas
-from app.domains.inv.crud import material_category as material_category_crud  # CRUD 직접 사용 (테스트 셋업용)
-from app.domains.inv.crud import material as material_crud
-from app.domains.inv.crud import material_batch as material_batch_crud
-from app.domains.inv.crud import material_transaction as material_transaction_crud
+from app.domains.inv.old.___crud import material_category as material_category_crud  # CRUD 직접 사용 (테스트 셋업용)
+from app.domains.inv.old.___crud import material as material_crud
+from app.domains.inv.old.___crud import material_batch as material_batch_crud
+from app.domains.inv.old.___crud import material_transaction as material_transaction_crud
 
 
 # conftest.py에서 정의된 픽스처들을 Pytest가 자동으로 감지하여 사용할 수 있습니다.

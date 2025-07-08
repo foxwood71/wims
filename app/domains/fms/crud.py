@@ -20,7 +20,7 @@ from fastapi import HTTPException, status
 from app.core.crud_base import CRUDBase
 from . import models as fms_models
 from . import schemas as fms_schemas
-from app.tasks import fms_tasks as fms_eq_tasks
+from . import tasks as fms_tasks
 
 
 # =============================================================================
@@ -101,7 +101,7 @@ class CRUDEquipmentSpecDefinition(
                 # 관련 데이터가 있는 경우에만 비동기 작업 큐에 스펙 이름 변경 동기화 작업 추가
                 if arq_redis_pool:
                     await arq_redis_pool.enqueue_job(
-                        fms_eq_tasks.sync_equipment_specs_on_spec_definition_name_change.__name__,
+                        fms_tasks.sync_equipment_specs_on_spec_definition_name_change.__name__,
                         db_obj.id,
                         old_spec_name,
                         new_spec_name,
@@ -145,7 +145,7 @@ class CRUDEquipmentSpecDefinition(
             #  관련 데이터가 있는 경우에만 비동기 작업 큐에 스펙 삭제 동기화 작업 추가
             if arq_redis_pool:
                 await arq_redis_pool.enqueue_job(
-                    fms_eq_tasks.sync_equipment_specs_on_spec_definition_delete.__name__,
+                    fms_tasks.sync_equipment_specs_on_spec_definition_delete.__name__,
                     id,
                     spec_name_to_remove,
                 )

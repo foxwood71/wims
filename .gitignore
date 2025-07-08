@@ -91,3 +91,4 @@ uploaded_files/
 # ------------------------------------
 # alembic_version # Alembic 버전 테이블 자체를 무시할 필요는 없지만,
 #                 # 특정 로컬 Alembic 로그나 임시 파일을 무시할 수 있습니다.
+app/domains/inv/old/___crud.py
