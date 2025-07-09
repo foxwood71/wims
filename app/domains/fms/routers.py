@@ -424,7 +424,7 @@ async def delete_equipment_spec(
 #  =============================================================================
 #  6. fms.equipment_histories 엔드포인트 (설비 이력 관리)
 #  =============================================================================
-@router.post("equipment_histories", response_model=fms_schemas.EquipmentHistoryResponse, status_code=status.HTTP_201_CREATED, summary="새 설비 이력 기록 생성")
+@router.post("/equipment_histories", response_model=fms_schemas.EquipmentHistoryResponse, status_code=status.HTTP_201_CREATED, summary="새 설비 이력 기록 생성")
 async def create_equipment_history(
     history_create: fms_schemas.EquipmentHistoryCreate,
     db: Session = Depends(deps.get_db_session),

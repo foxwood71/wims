@@ -59,11 +59,11 @@ touch migrations/versions/**init**.py
   rm migrations/versions/\*.py
   touch migrations/versions/**init**.py
 
-- 데이터 베이스 초기 테이블 생성
+- "설계도" 작성 **Python 모델 코드(SQLModel)**와 실제 데이터베이스의 테이블 상태를 비교
   alembic revision --autogenerate -m "Create initial tables"
-  @ versions 디렉토리에 1a2b3c4d_create_initial_tables.py류의 파일 신규 생성
+  => @ versions 디렉토리에 1a2b3c4d_create_initial_tables.py류의 파일 신규 생성
 
-- 데이터베이스에 마이그레이션 적용
+- "설계도"(마이그레이션 스크립트)를 보고 실제 데이터베이스에 변경사항을 적용
   alembic upgrade head
   ```head`는 가장 최신 버전의 마이그레이션을 의미합니다. 이 명령어를 실행하면 데이터베이스에 접속하여 마이그레이션 스크립트에 정의된 `CREATE TABLE` 등의 SQL 구문이 실행됩니다.
 
@@ -107,4 +107,41 @@ equipment_spec_definitions에 정의된 속성이 변경(추가, 또는 삭제, 
 
 자재 파트에 있는 \_validate_specs라는 강력한 유효성 검사 로직을 적용해서 설비 카테고리에 미리 정의된 스펙 키 외에는 specs에 추가할 수 없도록 해줘
 
+# HTTP 상태 코드
+
+1. 성공 응답 (2xx)
+
+   - 200 OK : 요청이 성공적으로 처리됨
+   - 201 Created : 리소스 생성 완료 (예: POST 요청)
+   - 202 Accepted : 요청 접수, 처리 결과는 비동기적으로 전달
+
+2. 리다이렉트 (3xx)
+
+   - 301 Moved Permanently : 영구적 URL 이동 (SEO에 영향)
+   - 302 Found : 일시적 URL 이동 (로봇에 영향 없음)
+   - 304 Not Modified : 캐시된 콘텐츠 사용 가능
+
+3. 클라이언트 오류 (4xx)
+
+   - 400 Bad Request : 요청이 잘못됨 (예: 유효하지 않은 URL)
+   - 401 Unauthorized : 인증 필요
+   - 404 Not Found : 요청한 리소스가 없음
+
+4. 서버 오류 (5xx)
+
+   - 500 Internal Server Error : 서버 내부 오류 (예: 코드 버그)
+   - 503 Service Unavailable : 서버 과부하 또는 유지보수 중
+
+5. 기타
+
+   - 226 IM Used : HTTP 델타 인코딩 시 사용 (리소스 변경 반영)
+   - 307 Temporary Redirect : 일시적 리다이렉트 (메소드 변경 불가)
+
 # 테스트 오류
+
+FAILED tests/domains/test_inv_n.py::test_update_placeholder_spec_with_valid_key - AttributeError: module 'app.domains.inv.tasks' has no attribute 'add_spec_to_materials_in_category'
+FAILED tests/domains/test_inv_n.py::test_create_spec_with_misc_notes_key - AttributeError: module 'app.domains.inv.tasks' has no attribute 'add_spec_to_materials_in_category'
+FAILED tests/domains/test_inv_n.py::test_update_spec_with_null_to_delete_key - AttributeError: module 'app.domains.inv.tasks' has no attribute 'add_spec_to_materials_in_category'
+FAILED tests/domains/test_inv_n.py::test_add_spec_def_propagates_to_material_spec - AttributeError: module 'app.domains.inv.tasks' has no attribute 'add_spec_to_materials_in_category'
+FAILED tests/domains/test_inv_n.py::test_remove_spec_def_propagates_to_material_spec - AttributeError: module 'app.domains.inv.tasks' has no attribute 'add_spec_to_materials_in_category'
+FAILED tests/domains/test_inv_n.py::test_update_spec_def_name_propagates_to_material_spec - AttributeError: module 'app.domains.inv.tasks' has no attribute 'add_spec_to_materials_in_category'

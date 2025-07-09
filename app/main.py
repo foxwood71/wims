@@ -39,11 +39,12 @@ from app.domains.rpt.routers import router as rpt_router
 worker_functions = [
     core_tasks.health_check_database_task,
     shared_tasks.cleanup_unused_images_task,
-    inv_tasks.change_spec_key_from_materials_in_category,
-    inv_tasks.remove_spec_key_from_materials_in_category,
-    inv_tasks.add_spec_to_materials_in_category,
-    fms_tasks.sync_equipment_specs_on_spec_definition_name_change,  # change_spec_key_from_materials_in_category
-    fms_tasks.sync_equipment_specs_on_spec_definition_delete,  # remove_spec_key_from_materials_in_category
+    inv_tasks.add_spec_key_for_all_materials,
+    inv_tasks.update_spec_key_for_all_materials,
+    inv_tasks.delete_spec_key_for_all_materials,
+    fms_tasks.add_spec_key_for_all_equipments,
+    fms_tasks.update_spec_key_for_all_equipments,
+    fms_tasks.delete_spec_key_from_all_equipments,
     lims_tasks.sync_worksheet_item_code_change,
     lims_tasks.add_new_item_to_worksheet_data,
 ]

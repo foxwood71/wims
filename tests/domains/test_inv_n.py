@@ -302,8 +302,20 @@ async def test_update_spec_def_name_propagates_to_material_spec(
 # =================================================================================
 async def setup_fifo_test_data(db_session, material, plant, vendor):
     """FIFO 테스트를 위한 배치 데이터 생성 헬퍼 함수"""
-    batch1 = inv_models.MaterialBatch(material_id=material.id, facility_id=plant.id, quantity=Decimal("30.0"), received_date=datetime(2025, 1, 1, tzinfo=UTC), vendor_id=vendor.id)
-    batch2 = inv_models.MaterialBatch(material_id=material.id, facility_id=plant.id, quantity=Decimal("50.0"), received_date=datetime(2025, 2, 1, tzinfo=UTC), vendor_id=vendor.id)
+    batch1 = inv_models.MaterialBatch(
+        material_id=material.id,
+        facility_id=plant.id,
+        quantity=Decimal("20.0"),
+        received_date=datetime(2025, 1, 1, tzinfo=UTC),
+        vendor_id=vendor.id
+    )
+    batch2 = inv_models.MaterialBatch(
+        material_id=material.id,
+        facility_id=plant.id,
+        quantity=Decimal("30.0"),
+        received_date=datetime(2025, 2, 1, tzinfo=UTC),
+        vendor_id=vendor.id
+    )
     db_session.add_all([batch1, batch2])
     await db_session.commit()
     await db_session.refresh(batch1)
@@ -336,13 +348,10 @@ async def test_create_transaction_usage_fifo_partial_depletion(
     )
     assert response.status_code == 201
 
-    # --- 👇 여기가 핵심 수정 부분입니다! ---
-    #  응답이 리스트이므로, 첫 번째 항목을 선택하여 검증합니다.
     response_data = response.json()
     assert isinstance(response_data, list)
     assert len(response_data) == 1
     assert response_data[0]["source_batch_id"] == batch1.id
-    # --- 👆 여기까지가 핵심 수정 부분입니다. ---
 
     await db_session.refresh(batch1)
     await db_session.refresh(batch2)

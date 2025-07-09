@@ -1,117 +1,68 @@
 # app/tasks/inv_tasks.py
 
-# import json
-from typing import Any, Dict, List
+import logging
+from typing import Any, Dict  # , List
 
-from sqlalchemy.sql import text
+# from sqlalchemy.sql import text
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.core.database import get_async_session_context
+# from app.core.database import get_async_session_context
 from app.domains.inv import models as inv_models
 
+#  로거 설정
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-async def change_spec_key_from_materials_in_category(
-    ctx,  # ARQ context
-    spec_definition_id: int,
-    old_spec_name: str,
-    new_spec_name: str,
-    category_ids: List[int]  # 관련 카테고리 ID 목록
-):
-    """
-    MaterialSpecDefinition의 이름이 변경되었을 때,
-    관련된 MaterialSpec의 specs JSONB 필드의 키를 업데이트하는 백그라운드 작업.
-    """
-    print(f"백그라운드 작업 시작: MaterialSpecDefinition ID {spec_definition_id} 이름 변경 동기화: '{old_spec_name}' -> '{new_spec_name}'")
-    print(f"대상 카테고리 ID: {category_ids}")
+# async def change_spec_key_from_materials_in_category(
+#     ctx,  # ARQ context
+#     spec_definition_id: int,
+#     old_spec_name: str,
+#     new_spec_name: str,
+#     category_ids: List[int]  # 관련 카테고리 ID 목록
+# ):
+#     """
+#     MaterialSpecDefinition의 이름이 변경되었을 때,
+#     관련된 MaterialSpec의 specs JSONB 필드의 키를 업데이트하는 백그라운드 작업.
+#     """
+#     print(f"백그라운드 작업 시작: MaterialSpecDefinition ID {spec_definition_id} 이름 변경 동기화: '{old_spec_name}' -> '{new_spec_name}'")
+#     print(f"대상 카테고리 ID: {category_ids}")
 
-    #  PostgreSQL의 jsonb 함수를 사용하여 단일 UPDATE 쿼리 실행
-    #  old_spec_name 키를 제거하고, new_spec_name 키로 값을 이동
-    query = text("""
-        UPDATE inv.materials_specs AS ms
-        SET specs = (ms.specs - :old_spec_name) || jsonb_build_object(:new_spec_name, ms.specs -> :old_spec_name)
-        FROM inv.materials AS m
-        WHERE
-            ms.materials_id = m.id
-            AND m.material_category_id = ANY(:category_ids)
-            AND ms.specs ? :old_spec_name;
-    """)
+#     #  PostgreSQL의 jsonb 함수를 사용하여 단일 UPDATE 쿼리 실행
+#     #  old_spec_name 키를 제거하고, new_spec_name 키로 값을 이동
+#     query = text("""
+#         UPDATE inv.materials_specs AS ms
+#         SET specs = (ms.specs - :old_spec_name) || jsonb_build_object(:new_spec_name, ms.specs -> :old_spec_name)
+#         FROM inv.materials AS m
+#         WHERE
+#             ms.materials_id = m.id
+#             AND m.material_category_id = ANY(:category_ids)
+#             AND ms.specs ? :old_spec_name;
+#     """)
 
-    updated_count = 0
-    async with get_async_session_context() as db:
-        try:
-            result = await db.execute(
-                query,
-                {
-                    "old_spec_name": old_spec_name,
-                    "new_spec_name": new_spec_name,
-                    "category_ids": category_ids,
-                },
-            )
-            await db.commit()
-            updated_count = result.rowcount
-        except Exception as e:
-            await db.rollback()
-            # 실제 환경에서는 로깅 시스템에 에러를 기록
-            print(f"백그라운드 자재 스펙 이름 변경 동기화 실패: {e}")
-            return {"status": "error", "message": str(e)}
+#     updated_count = 0
+#     async with get_async_session_context() as db:
+#         try:
+#             result = await db.execute(
+#                 query,
+#                 {
+#                     "old_spec_name": old_spec_name,
+#                     "new_spec_name": new_spec_name,
+#                     "category_ids": category_ids,
+#                 },
+#             )
+#             await db.commit()
+#             updated_count = result.rowcount
+#         except Exception as e:
+#             await db.rollback()
+#             # 실제 환경에서는 로깅 시스템에 에러를 기록
+#             print(f"백그라운드 자재 스펙 이름 변경 동기화 실패: {e}")
+#             return {"status": "error", "message": str(e)}
 
-    print(f"작업 완료! 총 {updated_count}개의 MaterialSpec 데이터가 업데이트됨.")
-    return {"status": "success", "updated_count": updated_count}
+#     print(f"작업 완료! 총 {updated_count}개의 MaterialSpec 데이터가 업데이트됨.")
+#     return {"status": "success", "updated_count": updated_count}
 
-
-async def remove_spec_key_from_materials_in_category(
-    ctx: Dict[str, Any],  # ARQ context
-    category_id: int,  # 관련 카테고리 ID
-    spec_key_to_remove: str,
-):
-    """
-    MaterialSpecDefinition이 삭제되었을 때,
-    관련된 MaterialSpec의 specs JSONB 필드에서 해당 키를 제거하는 백그라운드 작업.
-    """
-    db: AsyncSession = ctx['db']
-    print(
-        f"백그라운드 작업 시작: 카테고리 ID {category_id}에서 "
-        f"스펙 키 '{spec_key_to_remove}' 제거 동기화"
-    )
-
-    # 1. 카테고리에 속한 모든 자재를 조회합니다.
-    material_query = select(inv_models.Material).where(
-        inv_models.Material.material_category_id == category_id
-    )
-    materials_result = await db.execute(material_query)
-    materials = materials_result.scalars().all()
-    if not materials:
-        print("작업 완료! 스펙을 제거할 자재가 없습니다.")
-        return {"status": "ok", "updated_count": 0}
-
-    material_ids = [m.id for m in materials]
-
-    # 2. 해당 자재들의 기존 스펙 정보를 한 번에 가져옵니다.
-    spec_query = select(inv_models.MaterialSpec).where(
-        inv_models.MaterialSpec.materials_id.in_(material_ids)
-    )
-    specs_result = await db.execute(spec_query)
-    specs_to_update = specs_result.scalars().all()
-
-    update_count = 0
-    # 3. 각 자재 스펙에서 해당 키를 제거합니다.
-    for spec in specs_to_update:
-        if spec_key_to_remove in spec.specs:
-            new_specs = spec.specs.copy()
-            new_specs.pop(spec_key_to_remove, None)
-            spec.specs = new_specs  # 변경 감지를 위해 재할당
-            db.add(spec)
-            update_count += 1
-
-    if update_count > 0:
-        await db.commit()
-
-    print(f"작업 완료! 총 {update_count}개의 MaterialSpec 데이터에서 항목 키 제거됨.")
-    return {"status": "ok", "updated_count": update_count}
-
-
-async def add_spec_to_materials_in_category(
+async def add_spec_key_for_all_materials(
     ctx: Dict[str, Any], category_id: int, spec_key: str
 ) -> Dict[str, Any]:
     """
@@ -227,4 +178,55 @@ async def update_spec_key_for_all_materials(
         await db.commit()
 
     print(f"작업 완료! 총 {update_count}개의 MaterialSpec 데이터에서 키 이름 변경됨.")
+    return {"status": "ok", "updated_count": update_count}
+
+
+async def delete_spec_key_for_all_materials(
+    ctx: Dict[str, Any],  # ARQ context
+    category_id: int,  # 관련 카테고리 ID
+    spec_key_to_remove: str,
+):
+    """
+    MaterialSpecDefinition이 삭제되었을 때,
+    관련된 MaterialSpec의 specs JSONB 필드에서 해당 키를 제거하는 백그라운드 작업.
+    """
+    db: AsyncSession = ctx['db']
+    print(
+        f"백그라운드 작업 시작: 카테고리 ID {category_id}에서 "
+        f"스펙 키 '{spec_key_to_remove}' 제거 동기화"
+    )
+
+    # 1. 카테고리에 속한 모든 자재를 조회합니다.
+    material_query = select(inv_models.Material).where(
+        inv_models.Material.material_category_id == category_id
+    )
+    materials_result = await db.execute(material_query)
+    materials = materials_result.scalars().all()
+    if not materials:
+        print("작업 완료! 스펙을 제거할 자재가 없습니다.")
+        return {"status": "ok", "updated_count": 0}
+
+    material_ids = [m.id for m in materials]
+
+    # 2. 해당 자재들의 기존 스펙 정보를 한 번에 가져옵니다.
+    spec_query = select(inv_models.MaterialSpec).where(
+        inv_models.MaterialSpec.materials_id.in_(material_ids)
+    )
+    specs_result = await db.execute(spec_query)
+    specs_to_update = specs_result.scalars().all()
+
+    update_count = 0
+    # 3. 각 자재 스펙에서 해당 키를 제거합니다.
+    for spec in specs_to_update:
+        if spec_key_to_remove in spec.specs:
+            new_specs = spec.specs.copy()
+            new_specs.pop(spec_key_to_remove, None)
+            spec.specs = new_specs  # 변경 감지를 위해 재할당
+            db.add(spec)
+            update_count += 1
+
+    if update_count > 0:
+        await db.commit()
+
+    print(f"작업 완료! 총 {update_count}개의 MaterialSpec 데이터에서 항목 키 제거됨.")
     return {"status": "ok", "updated_count": update_count}

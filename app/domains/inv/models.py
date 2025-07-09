@@ -269,7 +269,7 @@ class MaterialTransactionBase(SQLModel):
     material_id: int = Field(foreign_key="inv.materials.id")
     facility_id: int = Field(foreign_key="loc.facilities.id")
     transaction_type: str = Field(max_length=50)
-    quantity_change: float = Field(sa_column=Column(Numeric(18, 2)))
+    quantity_change: Decimal = Field(..., sa_column=Column(Numeric(19, 4)))
     transaction_date: datetime = Field(
         default_factory=lambda: datetime.now(UTC),
         sa_column=Column(TIMESTAMP(timezone=True))

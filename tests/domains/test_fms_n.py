@@ -351,12 +351,12 @@ class TestEquipment:
             "name": "유입 펌프 #1",
             "serial_number": "SN-PUMP-001",
             "asset_tag": "ASSET-001",
-            "status": fms_models.EquipmentStatus.OPERATIONAL.value,
+            "status": fms_models.EquipmentStatus.ACTIVE.value,
         }
         response = await admin_client.post("/api/v1/fms/equipments", json=equipment_data)
         assert response.status_code == 201
         assert response.json()["name"] == equipment_data["name"]
-        assert response.json()["status"] == fms_models.EquipmentStatus.OPERATIONAL
+        assert response.json()["status"] == fms_models.EquipmentStatus.ACTIVE
 
     async def test_read_equipments_with_filters(self, client: AsyncClient, fms_test_equipment: fms_models.Equipment):
         """(성공) 다양한 필터로 설비 목록 조회"""
@@ -379,7 +379,7 @@ class TestEquipment:
 
     async def test_update_equipment_by_admin(self, admin_client: AsyncClient, fms_test_equipment: fms_models.Equipment):
         """(성공) 관리자가 설비 정보 업데이트"""
-        update_data = {"name": "업데이트된 설비명", "status": "MAINTENANCE"}
+        update_data = {"name": "업데이트된 설비명", "status": "maintenance"}
         response = await admin_client.put(f"/api/v1/fms/equipments/{fms_test_equipment.id}", json=update_data)
         assert response.status_code == 200
         data = response.json()
@@ -504,7 +504,7 @@ class TestEquipmentHistory:
         await admin_client.post("/api/v1/fms/equipment_histories", json={"equipment_id": fms_test_equipment.id, "change_type": "INSTALL"})
         await admin_client.post("/api/v1/fms/equipment_histories", json={"equipment_id": fms_test_equipment.id, "change_type": "REPAIR"})
 
-        response = await client.get(f"/api/v1/fms/equipments/{fms_test_equipment.id}/history")
+        response = await client.get(f"/api/v1/fms/equipments/{fms_test_equipment.id}/histories")
         assert response.status_code == 200
         history_list = response.json()
         assert len(history_list) == 2

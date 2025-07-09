@@ -5,13 +5,14 @@
 """
 
 from typing import List, Optional, Any, Dict
-from datetime import date, datetime, UTC
+# from datetime import date, datetime, UTC
+import logging
 
 from sqlalchemy import text
 from sqlalchemy.sql import func
-from sqlalchemy.orm import selectinload
+# from sqlalchemy.orm import selectinload
 
-from sqlmodel import select, SQLModel
+from sqlmodel import select  # , SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from fastapi import HTTPException, status
@@ -21,6 +22,10 @@ from app.core.crud_base import CRUDBase
 from . import models as fms_models
 from . import schemas as fms_schemas
 from . import tasks as fms_tasks
+
+#  로거 설정
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 # =============================================================================
@@ -65,6 +70,14 @@ class CRUDEquipmentSpecDefinition(
     def __init__(self):
         super().__init__(model=fms_models.EquipmentSpecDefinition)
 
+    async def get_by_name(
+        self, db: AsyncSession, *, name: str
+    ) -> Optional[fms_models.EquipmentSpecDefinition]:
+        """이름으로 스펙 정의를 조회합니다."""
+        query = select(self.model).where(self.model.name == name)
+        result = await db.execute(query)
+        return result.scalar_one_or_none()
+
     async def create(self, db: AsyncSession, *, obj_in: fms_schemas.EquipmentSpecDefinitionCreate) -> fms_models.EquipmentSpecDefinition:
         """이름 중복을 확인하고 생성합니다."""
         if await self.get_by_name(db, name=obj_in.name):
@@ -83,38 +96,37 @@ class CRUDEquipmentSpecDefinition(
         업데이트 시 이름 중복을 확인하고, 이름 변경 시 관련 EquipmentSpec 동기화 작업을
         백그라운드 큐에 추가합니다. 관련 데이터가 없는 경우 즉시 반영합니다.
         """
-        if obj_in.name is not None and obj_in.name != db_obj.name:
-            existing_by_name = await self.get_by_name(db, name=obj_in.name)
-            if existing_by_name and existing_by_name.id != db_obj.id:
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Equipment spec definition with this name already exists.")
 
-            old_spec_name = db_obj.name
-            new_spec_name = obj_in.name
+        old_name = db_obj.name
 
-            # 관련 EquipmentSpec 데이터가 있는지 확인
-            # f-string 접두사 'f'를 제거했습니다.
-            check_query = text("SELECT 1 FROM fms.equipment_specs WHERE specs ? :old_spec_name LIMIT 1;")
-            result = await db.execute(check_query, {"old_spec_name": old_spec_name})
-            has_related_specs = result.scalar_one_or_none() is not None
+        #  1. obj_in의 타입에 따라 new_name을 안전하게 추출합니다.
+        new_name = None
+        if isinstance(obj_in, fms_schemas.EquipmentSpecDefinitionUpdate):
+            new_name = obj_in.name
+        elif isinstance(obj_in, dict):
+            new_name = obj_in.get("name")
 
-            if has_related_specs:
-                # 관련 데이터가 있는 경우에만 비동기 작업 큐에 스펙 이름 변경 동기화 작업 추가
-                if arq_redis_pool:
-                    await arq_redis_pool.enqueue_job(
-                        fms_tasks.sync_equipment_specs_on_spec_definition_name_change.__name__,
-                        db_obj.id,
-                        old_spec_name,
-                        new_spec_name,
-                    )
-                    print(f"ARQ Job enqueued: sync_equipment_specs_on_spec_definition_name_change for SpecDef ID {db_obj.id}")
-                else:
-                    print("ARQ Redis pool not available, skipping background task for spec name change. (Related data exists)")
-                    # 프로덕션에서는 이 경우 에러를 발생시키거나 경고 로깅을 해야 합니다.
+        #  2. 데이터를 변환하지 않고 그대로 부모 클래스의 update 메소드에 전달합니다.
+        updated_obj = await super().update(db=db, db_obj=db_obj, obj_in=obj_in)
+
+        #  3. 업데이트 후 추가 로직을 수행합니다.
+        if new_name and old_name != new_name:
+            if arq_redis_pool:
+                await arq_redis_pool.enqueue_job(
+                    "update_spec_key_for_all_equipments",
+                    db_obj.id,
+                    old_name,
+                    new_name,
+                )
             else:
-                print("No related EquipmentSpec data found for name change, immediate reflection.")
-                # 관련 데이터가 없으므로 동기화 태스크 불필요
-
-        return await super().update(db, db_obj=db_obj, obj_in=obj_in)
+                logger.info(
+                    "ARQ Redis pool not available, "
+                    "performing spec key update synchronously."
+                )
+                await fms_tasks.update_spec_key_for_all_equipments(
+                    {"db": db}, db_obj.id, old_name, new_name
+                )
+        return updated_obj
 
     async def remove(
         self,

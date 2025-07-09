@@ -265,7 +265,7 @@ class MaterialCategorySpecDefinitionCRUD(
 
         if arq_redis_pool:
             await arq_redis_pool.enqueue_job(
-                "add_spec_to_materials_in_category",
+                "add_spec_key_for_all_materials",
                 material_category_id,
                 spec_key
             )
@@ -275,7 +275,7 @@ class MaterialCategorySpecDefinitionCRUD(
                 "Performing spec key addition synchronously for category %d.",
                 material_category_id,
             )
-            await inv_tasks.add_spec_to_materials_in_category(
+            await inv_tasks.add_spec_key_for_all_materials(
                 {"db": db}, material_category_id, spec_key
             )
 
@@ -317,7 +317,7 @@ class MaterialCategorySpecDefinitionCRUD(
                 "Performing spec key removal synchronously for category %d.",
                 material_category_id,
             )
-            await inv_tasks.remove_spec_key_from_materials_in_category(
+            await inv_tasks.delete_spec_key_for_all_materials(
                 {"db": db}, material_category_id, spec_key_to_remove
             )
 
