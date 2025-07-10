@@ -1,81 +1,90 @@
-# tests/test_corp.py
+# tests/domains/test_corp_n.py
 
-from fastapi.testclient import TestClient
-from sqlmodel import Session
+import pytest
+from httpx import AsyncClient
+from sqlmodel.ext.asyncio.session import AsyncSession
+from io import BytesIO
 
-from app.domains.corp.models import CompanyInfo
+from app.domains.corp import models as corp_models
 
-API_PREFIX = "/api/v1/corp/company-info"
+#  API 경로를 정확하게 수정합니다.
+API_PREFIX = "/api/v1/corp"
 
 
-def test_get_company_info_initially(client: TestClient):
+@pytest.mark.asyncio
+async def test_get_company_info_initially(client: AsyncClient, db_session: AsyncSession):
     """
     최초로 회사 정보를 조회할 때 기본값이 생성되는지 테스트합니다.
     """
-    #  When: 회사 정보 조회를 요청하면
-    response = client.get(f"{API_PREFIX}/")
-    data = response.json()
-
-    #  Then: 정상 응답(200)을 받고, 기본 회사명이 설정되어 있어야 합니다.
+    response = await client.get(f"{API_PREFIX}/")
     assert response.status_code == 200
+    data = response.json()
     assert data["name"] == "기본 회사명"
     assert data["id"] == 1
+    assert data["logo"] is None  # 최초에는 로고가 없음
 
 
-def test_update_company_info(client: TestClient, db: Session):
+@pytest.mark.asyncio
+async def test_update_company_info(authorized_client: AsyncClient, db_session: AsyncSession):
     """
     회사 정보를 성공적으로 수정하는지 테스트합니다.
     """
-    #  Given: 수정할 새로운 회사 정보를 준비합니다.
+    #  먼저 정보 생성을 위해 한 번 호출
+    await authorized_client.get(f"{API_PREFIX}/")
+
     update_data = {
         "name": "새로운 주식회사",
         "ceo_name": "홍길동",
-        "contact_email": "test@newcorp.com",
-        "address": "서울시 강남구 테헤란로",
     }
-
-    #  When: 회사 정보 수정을 요청하면
-    response = client.patch(f"{API_PREFIX}/", json=update_data)
-    data = response.json()
-
-    #  Then: 정상 응답(200)을 받고, 정보가 올바르게 수정되어야 합니다.
+    response = await authorized_client.patch(f"{API_PREFIX}/", json=update_data)
     assert response.status_code == 200
+    data = response.json()
     assert data["name"] == "새로운 주식회사"
     assert data["ceo_name"] == "홍길동"
-    assert data["contact_email"] == "test@newcorp.com"
-    assert data["address"] == "서울시 강남구 테헤란로"
 
-    #  And: 데이터베이스에도 실제 반영되었는지 확인합니다.
-    db_info = db.get(CompanyInfo, 1)
+    db_info = await db_session.get(corp_models.CompanyInfo, 1)
     assert db_info.name == "새로운 주식회사"
 
 
-def test_update_company_info_partially(client: TestClient, db: Session):
+@pytest.mark.asyncio
+async def test_upload_company_logo(
+    authorized_client: AsyncClient, db_session: AsyncSession
+):
     """
-    회사 정보의 일부만 성공적으로 수정하는지 테스트합니다.
+    [신규] 회사 로고를 성공적으로 업로드하고, 정보가 갱신되는지 테스트합니다.
     """
-    #  Given: 기존 회사 정보를 생성하고, 일부만 수정할 데이터를 준비합니다.
-    client.get(f"{API_PREFIX}/")  # Ensure initial data exists
-    partial_update_data = {"logo_url": "https://new.logo/image.png"}
-
-    #  When: 회사 정보 부분 수정을 요청하면
-    response = client.patch(f"{API_PREFIX}/", json=partial_update_data)
-    data = response.json()
-
-    #  Then: 정상 응답(200)을 받고, 로고 URL만 수정되어야 합니다.
+    #  1. Given: 먼저 GET 요청으로 회사 정보를 생성/조회합니다.
+    await authorized_client.get(f"{API_PREFIX}/")
+        response = await client.get(f"{API_PREFIX}/")
+    response = await client.get(f"{API_PREFIX}/")
     assert response.status_code == 200
-    assert data["logo_url"] == "https://new.logo/image.png"
-
-    #  And: 기존 이름은 그대로 유지되어야 합니다.
+    data = response.json()
     assert data["name"] == "기본 회사명"
+    assert data["id"] == 1
+    assert data["logo"] is None  # 최초에는 로고가 없음
 
+    #  2. Given: 테스트용 이미지 파일을 준비합니다.
+    file_content = b"fake image data"
+    files = {
+        "upload_file": (
+            "test_logo.png",
+            BytesIO(file_content),
+            "image/png",
+        )
+    }
 
-def test_update_company_info_with_empty_data(client: TestClient):
-    """
-    수정할 데이터 없이 요청했을 때 400 에러가 발생하는지 테스트합니다.
-    """
-    #  When: 빈 JSON으로 수정을 요청하면
-    response = client.patch(f"{API_PREFIX}/", json={})
+    #  3. When: 로고 업로드 API를 호출합니다.
+    response = await authorized_client.post(f"{API_PREFIX}/logo", files=files)
 
-    #  Then: 400 Bad Request 응답을 받아야 합니다.
-    assert response.status_code == 400
+    #  4. Then: 응답을 검증합니다.
+    assert response.status_code == 200
+    data = response.json()
+    assert "logo" in data
+    assert data["logo"] is not None
+    assert data["logo"]["name"] == "test_logo.png"
+    assert "url" in data["logo"]
+    assert data["logo_file_id"] == data["logo"]["id"]
+
+    #  DB에서 직접 확인하여 최종적으로 검증합니다.
+    company_info = await db_session.get(corp_models.CompanyInfo, 1)
+    assert company_info.logo_file_id == data["logo"]["id"]

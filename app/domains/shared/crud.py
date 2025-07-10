@@ -4,7 +4,7 @@
 'shared' 도메인 (공용 데이터)과 관련된 CRUD 로직을 담당하는 모듈입니다.
 """
 import uuid
-import shutil
+# import shutil
 from pathlib import Path
 from fastapi import UploadFile
 
@@ -166,35 +166,29 @@ entity_image = CRUDEntityImage()
 # 5. 파일(File) 관련 CRUD (이 부분을 추가)
 # ==============================================================================
 class CRUDFile:
-    async def create_file(self, db: AsyncSession, *, file: UploadFile, user_id: uuid.UUID) -> shared_models.File:
+    async def create_file(self, db: AsyncSession, *, file_info: UploadFile) -> shared_models.File:
         """
         파일을 저장하고 DB에 레코드를 생성합니다.
         """
-        # 1. 파일 내용 읽기 및 크기 계산
-        contents = await file.read()
-        file_size = len(contents)
-        await file.seek(0)  # 포인터를 다시 처음으로
+        # # 1. 파일 내용 읽기 및 크기 계산
+        # contents = await file.read()
+        # file_size = len(contents)
+        # await file.seek(0)  # 포인터를 다시 처음으로
 
-        # 2. 고유한 파일명 생성 (UUID 사용)
-        file_extension = Path(file.filename).suffix
-        unique_filename = f"{uuid.uuid4()}{file_extension}"
+        # # 2. 고유한 파일명 생성 (UUID 사용)
+        # file_extension = Path(file.filename).suffix
+        # unique_filename = f"{uuid.uuid4()}{file_extension}"
 
-        # 3. 파일 저장 경로 설정 및 저장
-        upload_dir = Path(settings.UPLOAD_DIR)
-        upload_dir.mkdir(parents=True, exist_ok=True)  # 디렉토리 생성
-        file_path = upload_dir / unique_filename
+        # # 3. 파일 저장 경로 설정 및 저장
+        # upload_dir = Path(settings.UPLOAD_DIR)
+        # upload_dir.mkdir(parents=True, exist_ok=True)  # 디렉토리 생성
+        # file_path = upload_dir / unique_filename
 
-        with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
+        # with open(file_path, "wb") as buffer:
+        #     shutil.copyfileobj(file.file, buffer)
 
         # 4. DB 모델 객체 생성
-        db_obj = shared_models.File(
-            name=file.filename,
-            content_type=file.content_type,
-            path=unique_filename,  # 전체 경로가 아닌 상대 경로(고유 파일명) 저장
-            size=file_size,
-            uploaded_by_user_id=user_id,
-        )
+        db_obj = file_info
 
         db.add(db_obj)
         await db.commit()

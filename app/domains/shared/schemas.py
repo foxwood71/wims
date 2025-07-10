@@ -254,3 +254,7 @@ class FileRead(FileBase):
 
     class Config:
         from_attributes = True  # ORM 모델을 Pydantic 모델로 변환 (v2부터 이름 변경)
+
+
+class FileCreate(FileBase):
+    pass

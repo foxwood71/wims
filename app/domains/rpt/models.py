@@ -18,7 +18,7 @@ class ReportFormBase(SQLModel):
     description: Optional[str] = Field(default=None, description="보고서 양식에 대한 설명")
 
     #  shared.file 테이블의 id를 외래 키로 참조합니다.
-    template_file_id: int = Field(foreign_key="shared_file.id", description="템플릿 파일 ID")
+    template_file_id: int = Field(foreign_key="shared.files.id", description="템플릿 파일 ID")
 
 
 class ReportForm(ReportFormBase, table=True):

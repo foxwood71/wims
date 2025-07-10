@@ -8,12 +8,14 @@ CRUD 작업을 위한 HTTP 엔드포인트를 제공합니다.
 FastAPI의 APIRouter를 사용하여 엔드포인트를 그룹화하고 관리하며,
 역할 기반 접근 제어(RBAC)를 포함한 세분화된 권한 모델을 적용합니다.
 """
+import os
 import math
 from pathlib import Path
 from datetime import datetime, UTC
 from typing import List, Optional
 
 from sqlmodel import Session, update
+from sqlmodel.ext.asyncio.session import AsyncSession
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, Form, File
 from fastapi.responses import FileResponse
 
@@ -25,6 +27,7 @@ from app.domains.usr.models import User as UsrUser, UserRole
 from . import crud as shared_crud
 from . import models as shared_models
 from . import schemas as shared_schemas
+from . import services as shared_services
 
 # 애플리케이션 설정 (파일 저장 경로 등)
 from app.core.config import settings
@@ -455,56 +458,84 @@ async def delete_entity_image(
 @router.post("/files/upload", response_model=shared_schemas.FileUploadResponse, status_code=201)
 async def upload_file(
     *,
-    db: Session = Depends(deps.get_db_session),
+    session: Session = Depends(deps.get_db_session),
     current_user: UsrUser = Depends(deps.get_current_active_user),
     upload_file: UploadFile = File(...)
 ):
+    # """
+    # 파일을 서버에 업로드하고 데이터베이스에 메타데이터를 저장합니다.
+    # """
+    # try:
+    #     db_file = await shared_crud.file.create_file(
+    #         db=db, file=upload_file, user_id=current_user.id
+    #     )
+    #     # 파일 접근 URL 생성 (필요에 따라 수정)
+    #     file_url = f"/api/v1/shared/files/download/{db_file.id}"
+
+    #     # --- 반환하는 딕셔너리의 키를 수정합니다 ---
+    #     return {
+    #         "id": db_file.id,  # 'file_id' -> 'id'로 수정
+    #         "url": file_url,    # 'file_url' -> 'url'로 수정
+    #         "message": "File uploaded successfully."
+    #     }
+    # except Exception as e:
+    #     raise HTTPException(status_code=500, detail=f"File could not be uploaded: {e}")
     """
-    파일을 서버에 업로드하고 데이터베이스에 메타데이터를 저장합니다.
+    파일을 서버에 업로드하고 메타데이터를 DB에 저장합니다.
+    모든 파일 업로드 로직은 shared_services.upload_file를 호출하여 처리합니다.
     """
     try:
-        db_file = await shared_crud.file.create_file(
-            db=db, file=upload_file, user_id=current_user.id
+        #  1. 서비스 레이어에 파일 저장을 위임합니다.
+        db_file = await shared_services.upload_file(
+            db=session, upload_file=upload_file, uploader_id=current_user.id
         )
-        # 파일 접근 URL 생성 (필요에 따라 수정)
-        file_url = f"/api/v1/shared/files/download/{db_file.id}"
 
-        # --- 반환하는 딕셔너리의 키를 수정합니다 ---
+        #  2. 서비스 레이어에서 URL 생성 함수를 호출합니다.
+        file_url = shared_services.create_file_download_url(db_file.id)
+
         return {
-            "id": db_file.id,  # 'file_id' -> 'id'로 수정
-            "url": file_url,    # 'file_url' -> 'url'로 수정
-            "message": "File uploaded successfully."
+            "id": db_file.id,
+            "name": db_file.name,
+            "url": file_url,
+            "content_type": db_file.content_type,
+            "size": db_file.size,
+            "message": "File uploaded successfully.",
         }
+    except HTTPException as e:
+        #  서비스에서 발생한 HTTPException을 그대로 전달합니다.
+        raise e
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"File could not be uploaded: {e}")
+        #  그 외 예상치 못한 오류를 처리합니다.
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"파일을 업로드하지 못했습니다: {e}",
+        )
 
 
-@router.get("/files/download/{file_id}")
+@router.get(
+    "/download/{file_id}",
+    summary="파일 다운로드",
+    response_class=FileResponse
+)
 async def download_file(
-    *,
-    db: Session = Depends(deps.get_db_session),
-    file_id: int,
-    # current_user: UsrUser = Depends(get_current_active_user), # 필요시 권한 체크
+    file_id: int, session: AsyncSession = Depends(deps.get_db_session)
 ):
     """
-    ID를 사용하여 파일을 다운로드합니다.
+    ID를 사용하여 저장된 파일을 다운로드합니다.
     """
-    db_file = await shared_crud.file.get_file(db=db, file_id=file_id)
+    db_file = await shared_crud.file.get(db=session, id=file_id)
     if not db_file:
-        raise HTTPException(status_code=404, detail="File not found.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="File not found"
+        )
 
-    # 실제 파일 시스템 경로 결합
-    file_path = shared_crud.file.get_full_file_path(db_file)
-    if not file_path.exists():
-        # DB에 레코드는 있으나 실제 파일이 없는 경우
-        raise HTTPException(status_code=500, detail="File not found on server.")
+    #  파일 경로의 유효성을 확인합니다.
+    if not os.path.exists(db_file.path):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="File not found on disk"
+        )
 
-    return FileResponse(
-        path=str(file_path),
-        filename=db_file.name,
-        media_type=db_file.content_type,
-        headers={"Content-Disposition": f"attachment; filename=\"{db_file.name}\""}
-    )
+    return FileResponse(path=db_file.path, filename=db_file.name)
 
 
 @router.get("/files/{file_id}", response_model=shared_schemas.FileRead)

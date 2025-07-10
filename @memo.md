@@ -139,9 +139,14 @@ equipment_spec_definitions에 정의된 속성이 변경(추가, 또는 삭제, 
 
 # 테스트 오류
 
-FAILED tests/domains/test_inv_n.py::test_update_placeholder_spec_with_valid_key - AttributeError: module 'app.domains.inv.tasks' has no attribute 'add_spec_to_materials_in_category'
-FAILED tests/domains/test_inv_n.py::test_create_spec_with_misc_notes_key - AttributeError: module 'app.domains.inv.tasks' has no attribute 'add_spec_to_materials_in_category'
-FAILED tests/domains/test_inv_n.py::test_update_spec_with_null_to_delete_key - AttributeError: module 'app.domains.inv.tasks' has no attribute 'add_spec_to_materials_in_category'
-FAILED tests/domains/test_inv_n.py::test_add_spec_def_propagates_to_material_spec - AttributeError: module 'app.domains.inv.tasks' has no attribute 'add_spec_to_materials_in_category'
-FAILED tests/domains/test_inv_n.py::test_remove_spec_def_propagates_to_material_spec - AttributeError: module 'app.domains.inv.tasks' has no attribute 'add_spec_to_materials_in_category'
-FAILED tests/domains/test_inv_n.py::test_update_spec_def_name_propagates_to_material_spec - AttributeError: module 'app.domains.inv.tasks' has no attribute 'add_spec_to_materials_in_category'
+ERROR tests/domains/test_lims_n.py::TestWorksheetAndItems::test_create_worksheet_item_success
+ERROR tests/domains/test_lims_n.py::TestWorksheetAndItems::test_soft_delete_worksheet_item
+FAILED tests/domains/test_lims_n.py::test_soft_delete_parameter_success_admin
+FAILED tests/domains/test_lims_n.py::test_create_test_request_with_auto_user_id
+FAILED tests/domains/test_lims_n.py::test_create_sample_success
+FAILED tests/domains/test_lims_n.py::test_create_aliquot_sample_success
+FAILED tests/domains/test_lims_n.py::test_read_aliquot_samples_with_filter
+FAILED tests/domains/test_lims_n.py::test_update_aliquot_sample_status_triggers_parent_update
+FAILED tests/domains/test_lims_n.py::test_create_analysis_result_success_user
+FAILED tests/domains/test_lims_n.py::test_crud_sample_container
+FAILED tests/domains/test_lims_n.py::test_crud_weather_condition

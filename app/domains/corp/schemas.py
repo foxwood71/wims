@@ -1,57 +1,51 @@
 # app/domains/corp/schemas.py
 
 from typing import Optional
-from pydantic import BaseModel, Field
+from sqlmodel import SQLModel, Field
+
+from app.domains.shared.schemas import FileRead  # FileRead 스키마 임포트
 
 
-class CompanyInfoBase(BaseModel):
+class CompanyInfoBase(SQLModel):
     """
     회사 정보의 기본 속성을 정의하는 Pydantic Base 스키마입니다.
     """
     name: str = Field(..., max_length=100, description="회사명")
-    logo_url: Optional[str] = Field(
-        None, max_length=255, description="회사 로고 이미지 URL"
-    )
     ceo_name: Optional[str] = Field(None, max_length=50, description="대표자 이름")
-    contact_person: Optional[str] = Field(
-        None, max_length=50, description="담당자 이름"
-    )
-    contact_phone: Optional[str] = Field(
-        None, max_length=20, description="대표 연락처"
-    )
-    contact_email: Optional[str] = Field(
-        None, max_length=100, description="대표 이메일"
-    )
     address: Optional[str] = Field(None, max_length=255, description="사업장 주소")
+    business_registration_number: Optional[str] = Field(None, description="사업자 등록번호")
+    contact_phone: Optional[str] = Field(None, max_length=20, description="대표 전화")
+    contact_email: Optional[str] = Field(None, max_length=100, description="대표 이메일")
+    contact_person: Optional[str] = Field(None, max_length=50, description="담당자 이름")
 
     class Config:
         from_attributes = True  # ORM 모드 활성화
 
 
+# --- API Schemas ---
+class CompanyInfoCreate(CompanyInfoBase):
+    name: str
+
+
 class CompanyInfoRead(CompanyInfoBase):
-    """
-    회사 정보를 클라이언트에 응답하기 위한 Pydantic 모델입니다.
-    """
     id: int
+    logo_file_id: Optional[int] = None
 
 
-class CompanyInfoUpdate(BaseModel):
+class CompanyInfoReadWithLogo(CompanyInfoRead):
+    logo: Optional[FileRead] = None
+
+
+class CompanyInfoUpdate(SQLModel):
     """
     회사 정보를 업데이트하기 위한 Pydantic 모델입니다.
     모든 필드는 선택 사항입니다 (부분 업데이트 가능).
     """
-    name: Optional[str] = Field(None, max_length=100, description="회사명")
-    logo_url: Optional[str] = Field(
-        None, max_length=255, description="회사 로고 이미지 URL"
-    )
+    name: Optional[str] = Field(..., max_length=100, description="회사명")
     ceo_name: Optional[str] = Field(None, max_length=50, description="대표자 이름")
-    contact_person: Optional[str] = Field(
-        None, max_length=50, description="담당자 이름"
-    )
-    contact_phone: Optional[str] = Field(
-        None, max_length=20, description="대표 연락처"
-    )
-    contact_email: Optional[str] = Field(
-        None, max_length=100, description="대표 이메일"
-    )
     address: Optional[str] = Field(None, max_length=255, description="사업장 주소")
+    business_registration_number: Optional[str] = Field(None, description="사업자 등록번호")
+    contact_phone: Optional[str] = Field(None, max_length=20, description="대표 전화")
+    contact_email: Optional[str] = Field(None, max_length=100, description="대표 이메일")
+    contact_person: Optional[str] = Field(None, max_length=50, description="담당자 이름")
+    logo_file_id: Optional[int] = None

@@ -62,6 +62,7 @@ logger = logging.getLogger(__name__)
 #     print(f"작업 완료! 총 {updated_count}개의 MaterialSpec 데이터가 업데이트됨.")
 #     return {"status": "success", "updated_count": updated_count}
 
+
 async def add_spec_key_for_all_materials(
     ctx: Dict[str, Any], category_id: int, spec_key: str
 ) -> Dict[str, Any]:

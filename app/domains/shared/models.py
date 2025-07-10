@@ -20,6 +20,7 @@ from sqlmodel import Field, Relationship, SQLModel, Column
 # TYPE_CHECKING을 사용하여 순환 임포트 문제를 방지합니다.
 if TYPE_CHECKING:
     from app.domains.usr.models import User, Department  # User 모델 참조
+    from app.domains.corp.models import CompanyInfo  # CompanyInfo 모델 참조
     from app.domains.rpt.models import ReportForm  # ReportForm 모델 참조
 
 
@@ -244,7 +245,10 @@ class File(FileBase, table=True):
     """
     shared.file 테이블 모델을 정의하는 클래스입니다.
     """
-    __tablename__ = "shared_file"
+    __tablename__ = "files"
+    __table_args__ = (
+        {'schema': 'shared'}
+    )
 
     id: int = Field(default=None, primary_key=True)
 
@@ -267,7 +271,7 @@ class File(FileBase, table=True):
             "cascade": "all"
         }
     )
-    department: Optional["Department"] = Relationship()
 
-    #  rpt.ReportForm 과의 관계 설정 (새롭게 추가)
+    department: Optional["Department"] = Relationship()
     report_forms: List["ReportForm"] = Relationship(back_populates="template_file")
+    company_logo: Optional["CompanyInfo"] = Relationship(back_populates="logo")
