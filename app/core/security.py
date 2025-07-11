@@ -10,12 +10,12 @@
 """
 
 from datetime import datetime, timedelta, timezone
-from typing import Optional, Any
+from typing import Optional
 
 from jose import jwt, JWTError
 from passlib.context import CryptContext  # 비밀번호 해싱을 위한 라이브러리
 from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi.security import OAuth2PasswordBearer
 from sqlmodel import Session, select
 
 from app.core.config import settings  # 애플리케이션 설정

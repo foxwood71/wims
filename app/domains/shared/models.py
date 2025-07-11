@@ -273,5 +273,5 @@ class File(FileBase, table=True):
     )
 
     department: Optional["Department"] = Relationship()
-    report_forms: List["ReportForm"] = Relationship(back_populates="template_file")
     company_logo: Optional["CompanyInfo"] = Relationship(back_populates="logo")
+    report_forms: List["ReportForm"] = Relationship(back_populates="template_file")

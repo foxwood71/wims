@@ -14,6 +14,7 @@ class ReportFormBase(BaseModel):
     name: str = Field(..., max_length=100, description="보고서 양식 이름")
     description: Optional[str] = Field(None, description="보고서 양식에 대한 설명")
     template_file_id: int = Field(..., description="템플릿으로 사용할 파일의 ID (shared.file.id)")
+    is_active: bool = Field(True, description="활성화 여부")
 
 
 class ReportFormCreate(ReportFormBase):

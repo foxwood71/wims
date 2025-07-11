@@ -41,7 +41,7 @@ class CompanyInfoUpdate(SQLModel):
     회사 정보를 업데이트하기 위한 Pydantic 모델입니다.
     모든 필드는 선택 사항입니다 (부분 업데이트 가능).
     """
-    name: Optional[str] = Field(..., max_length=100, description="회사명")
+    name: Optional[str] = Field(None, max_length=100, description="회사명")
     ceo_name: Optional[str] = Field(None, max_length=50, description="대표자 이름")
     address: Optional[str] = Field(None, max_length=255, description="사업장 주소")
     business_registration_number: Optional[str] = Field(None, description="사업자 등록번호")

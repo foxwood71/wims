@@ -32,7 +32,7 @@ async def get_report_form(db: AsyncSession, form_id: int) -> Optional[models.Rep
 
 
 async def get_multi_report_forms(
-    db: AsyncSession, skip: int = 0, limit: int = 100
+    db: AsyncSession, skip: int = 0, limit: int = 100, is_active: Optional[bool] = None
 ) -> List[models.ReportForm]:
     """모든 보고서 양식 목록을 조회합니다. (템플릿 파일 정보 포함)"""
     statement = (
@@ -40,7 +40,13 @@ async def get_multi_report_forms(
         .offset(skip)
         .limit(limit)
         .options(selectinload(models.ReportForm.template_file))
+        .order_by(models.ReportForm.id)
     )
+
+    #  [추가] is_active 값이 주어졌을 때만 WHERE 조건을 추가합니다.
+    if is_active is not None:
+        statement = statement.where(models.ReportForm.is_active == is_active)
+
     result = await db.execute(statement)
     return result.scalars().all()
 
