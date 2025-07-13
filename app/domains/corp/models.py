@@ -5,7 +5,7 @@ from sqlmodel import Field, Relationship, SQLModel
 
 # 순환 참조 방지를 위해 TYPE_CHECKING 블록 내에서만 임포트합니다.
 if TYPE_CHECKING:
-    from app.domains.shared.models import File
+    from app.domains.shared.models import Resource
 
 
 class CompanyInfo(SQLModel, table=True):
@@ -25,6 +25,8 @@ class CompanyInfo(SQLModel, table=True):
     contact_email: Optional[str] = Field(default=None, max_length=100, description="대표 이메일")
 
     logo_file_id: Optional[int] = Field(
-        default=None, foreign_key="shared.files.id", description="로고 파일 ID"
+        default=None, foreign_key="shared.resources.id", description="로고 파일 ID"
     )
-    logo: Optional["File"] = Relationship(back_populates="company_logo")
+
+    # shared domain 관계 정의
+    logo: Optional["Resource"] = Relationship(back_populates="company_logo")

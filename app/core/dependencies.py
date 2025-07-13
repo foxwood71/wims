@@ -33,7 +33,6 @@ from app.core.security import (
     get_current_user_from_token,  # 토큰에서 사용자 정보를 가져오는 함수
     get_current_active_user,  # 활성 사용자 확인 함수
     get_current_admin_user,  # 관리자 사용자 확인 함수
-    get_current_superuser  # 최고 관리자 확인 함수
 )
 # 사용자 모델 임포트 (타입 힌팅에 필요)
 from app.domains.usr.models import User as UsrUser

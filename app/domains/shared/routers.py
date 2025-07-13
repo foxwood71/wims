@@ -3,34 +3,28 @@
 """
 'shared' 도메인 (애플리케이션 공용 데이터 관리)의 API 엔드포인트를 정의하는 모듈입니다.
 
-이 라우터는 애플리케이션의 공용 데이터(버전, 이미지 유형, 이미지, 엔티티 이미지)에 대한
+이 라우터는 애플리케이션의 공용 데이터(버전, 리소스 유형, 리소스, 엔티티 리소스)에 대한
 CRUD 작업을 위한 HTTP 엔드포인트를 제공합니다.
 FastAPI의 APIRouter를 사용하여 엔드포인트를 그룹화하고 관리하며,
 역할 기반 접근 제어(RBAC)를 포함한 세분화된 권한 모델을 적용합니다.
 """
-import os
-import math
 from pathlib import Path
-from datetime import datetime, UTC
 from typing import List, Optional
 
 from sqlmodel import Session, update
 from sqlmodel.ext.asyncio.session import AsyncSession
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, Form, File
-from fastapi.responses import FileResponse
+
 
 # 핵심 의존성 (데이터베이스 세션, 사용자 인증 등)
 from app.core import dependencies as deps
-from app.domains.usr.models import User as UsrUser, UserRole
+from app.domains.usr import models as usr_models
 
 # 'shared' 도메인의 CRUD, 모델, 스키마
 from . import crud as shared_crud
 from . import models as shared_models
 from . import schemas as shared_schemas
 from . import services as shared_services
-
-# 애플리케이션 설정 (파일 저장 경로 등)
-from app.core.config import settings
 
 
 router = APIRouter(
@@ -40,13 +34,13 @@ router = APIRouter(
 
 
 # =============================================================================
-# 1. app.versions 엔드포인트
+# 1. shared.versions 엔드포인트
 # =============================================================================
 @router.post("/versions", response_model=shared_schemas.VersionRead, status_code=status.HTTP_201_CREATED)
 async def create_version(
     version_create: shared_schemas.VersionCreate,
     db: Session = Depends(deps.get_db_session),
-    current_user: UsrUser = Depends(deps.get_current_admin_user)
+    current_user: usr_models.User = Depends(deps.get_current_admin_user)
 ):
     """
     새로운 애플리케이션 버전을 생성합니다. (관리자 권한 필요)
@@ -90,7 +84,7 @@ async def update_version(
     version_id: int,
     version_update: shared_schemas.VersionUpdate,
     db: Session = Depends(deps.get_db_session),
-    current_user: UsrUser = Depends(deps.get_current_admin_user)
+    current_user: usr_models.User = Depends(deps.get_current_admin_user)
 ):
     """
     특정 ID의 애플리케이션 버전을 업데이트합니다. (관리자 권한 필요)
@@ -106,7 +100,7 @@ async def update_version(
 async def delete_version(
     version_id: int,
     db: Session = Depends(deps.get_db_session),
-    current_user: UsrUser = Depends(deps.get_current_admin_user)
+    current_user: usr_models.User = Depends(deps.get_current_admin_user)
 ):
     """
     특정 ID의 애플리케이션 버전을 삭제합니다. (관리자 권한 필요)
@@ -120,435 +114,287 @@ async def delete_version(
 
 
 # =============================================================================
-# 2. app.image_types 엔드포인트
+# 2. shared.resource_category_types 엔드포인트
 # =============================================================================
-@router.post("/image_types", response_model=shared_schemas.ImageTypeRead, status_code=status.HTTP_201_CREATED)
-async def create_image_type(
-    image_type_create: shared_schemas.ImageTypeCreate,
+@router.post("/resources/category-types", response_model=shared_schemas.ResourceCategoryRead, status_code=status.HTTP_201_CREATED)
+async def create_resource_category_types(
+    resource_category_create: shared_schemas.ResourceCategoryCreate,
     db: Session = Depends(deps.get_db_session),
-    current_user: UsrUser = Depends(deps.get_current_admin_user)
+    current_user: usr_models.User = Depends(deps.get_current_admin_user)
 ):
     """
-    새로운 이미지 유형을 생성합니다. (관리자 권한 필요)
+    새로운 리소스 유형을 생성합니다. (관리자 권한 필요)
     """
-    db_image_type = await shared_crud.image_type.get_by_name(db, name=image_type_create.name)
-    if db_image_type:
-        raise HTTPException(status_code=400, detail="Image type with this name already exists")
+    db_resource_type = await shared_crud.resource_category.get_by_name(db, name=resource_category_create.name)
+    if db_resource_type:
+        raise HTTPException(status_code=400, detail="Resource Category with this name already exists")
 
-    return await shared_crud.image_type.create(db=db, obj_in=image_type_create)
+    return await shared_crud.resource_category.create(db=db, obj_in=resource_category_create)
 
 
-@router.get("/image_types", response_model=List[shared_schemas.ImageTypeRead])
-async def read_image_types(
+@router.get("/resources/category-types", response_model=List[shared_schemas.ResourceCategoryRead])
+async def read_resource_category_types(
     skip: int = 0,
     limit: int = 100,
     db: Session = Depends(deps.get_db_session)
 ):
     """
-    모든 이미지 유형 목록을 조회합니다.
+    모든 리소스 유형 목록을 조회합니다.
     """
-    image_types = await shared_crud.image_type.get_multi(db, skip=skip, limit=limit)
-    return image_types
+    resource_types = await shared_crud.resource_category.get_multi(db, skip=skip, limit=limit)
+    return resource_types
 
 
-@router.get("/image_types/{image_type_id}", response_model=shared_schemas.ImageTypeRead)
-async def read_image_type(
-    image_type_id: int,
+@router.get("/resources/category-types/{resource_category_id}", response_model=shared_schemas.ResourceCategoryRead)
+async def read_resource_category_type(
+    resource_category_id: int,
     db: Session = Depends(deps.get_db_session)
 ):
     """
-    특정 ID의 이미지 유형을 조회합니다.
+    특정 ID의 리소스 유형을 조회합니다.
     """
-    db_image_type = await shared_crud.image_type.get(db, id=image_type_id)
-    if db_image_type is None:
-        raise HTTPException(status_code=404, detail="Image type not found")
-    return db_image_type
+    db_resource_type = await shared_crud.resource_category.get(db, id=resource_category_id)
+    if db_resource_type is None:
+        raise HTTPException(status_code=404, detail="Resource type not found")
+    return db_resource_type
 
 
-@router.put("/image_types/{image_type_id}", response_model=shared_schemas.ImageTypeRead)
-async def update_image_type(
-    image_type_id: int,
-    image_type_update: shared_schemas.ImageTypeUpdate,
+@router.put("/resources/category-types/{resource_category_id}", response_model=shared_schemas.ResourceCategoryRead)
+async def update_resource_category_type(
+    resource_category_id: int,
+    resource_category_update: shared_schemas.ResourceCategoryUpdate,
     db: Session = Depends(deps.get_db_session),
-    current_user: UsrUser = Depends(deps.get_current_admin_user)
+    current_user: usr_models.User = Depends(deps.get_current_admin_user)
 ):
     """
-    특정 ID의 이미지 유형을 업데이트합니다. (관리자 권한 필요)
+    특정 ID의 리소스 유형을 업데이트합니다. (관리자 권한 필요)
     """
-    db_image_type = await shared_crud.image_type.get(db, id=image_type_id)
-    if db_image_type is None:
-        raise HTTPException(status_code=404, detail="Image type not found")
+    db_resource_type = await shared_crud.image_type.get(db, id=resource_category_id)
+    if db_resource_type is None:
+        raise HTTPException(status_code=404, detail="Resource type not found")
 
-    return await shared_crud.image_type.update(db=db, db_obj=db_image_type, obj_in=image_type_update)
+    return await shared_crud.resource_category.update(db=db, db_obj=db_resource_type, obj_in=resource_category_update)
 
 
-@router.delete("/image_types/{image_type_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_image_type(
-    image_type_id: int,
+@router.delete("/resources/category-types/{resource_category_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_resource_category_type(
+    resource_category_id: int,
     db: Session = Depends(deps.get_db_session),
-    current_user: UsrUser = Depends(deps.get_current_admin_user)
+    current_user: usr_models.User = Depends(deps.get_current_admin_user)
 ):
     """
-    특정 ID의 이미지 유형을 삭제합니다. (관리자 권한 필요)
-    참고: 이 이미지 유형을 참조하는 이미지가 있다면 삭제가 실패할 수 있습니다 (DB 제약).
+    특정 ID의 리소스 유형을 삭제합니다. (관리자 권한 필요)
+    참고: 이 리소스 유형을 참조하는 리소스가 있다면 삭제가 실패할 수 있습니다 (DB 제약).
     """
-    db_image_type = await shared_crud.image_type.get(db, id=image_type_id)
-    if db_image_type is None:
-        raise HTTPException(status_code=404, detail="Image type not found")
+    db_resource_type = await shared_crud.resource_category.get(db, id=resource_category_id)
+    if db_resource_type is None:
+        raise HTTPException(status_code=404, detail="Resource type not found")
 
-    await shared_crud.image_type.delete(db, id=image_type_id)
+    await shared_crud.resource_category.delete(db, id=resource_category_id)
     return {}
 
 
 # =============================================================================
-# 3. app.images 엔드포인트 (파일 업로드 포함)
+# 3. shared.resource 엔드포인트 (파일 업로드 포함)
 # =============================================================================
-@router.post("/images", response_model=shared_schemas.ImageRead, status_code=status.HTTP_201_CREATED)
-async def upload_image(
+@router.post("/resources", response_model=shared_schemas.ResourceRead, status_code=status.HTTP_201_CREATED)
+async def upload_resource(
     file: UploadFile = File(...),
-    image_type_id: Optional[int] = Form(None),
+    category_id: Optional[int] = Form(...),
     description: Optional[str] = Form(None),
-    db: Session = Depends(deps.get_db_session),
-    current_user: UsrUser = Depends(deps.get_current_active_user)
+    db: AsyncSession = Depends(deps.get_db_session),
+    current_user: usr_models.User = Depends(deps.get_current_active_user)
 ):
     """
-    새로운 이미지를 업로드하고 데이터베이스에 정보를 저장합니다.
+    새로운 리소스를 업로드하고 데이터베이스에 정보를 저장합니다.
     """
-    current_upload_dir = Path(settings.UPLOAD_DIR)
-    if not current_upload_dir.exists():
-        current_upload_dir.mkdir(parents=True, exist_ok=True)
-
-    allowed_extensions = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
-    file_extension = Path(file.filename).suffix.lower()
-    if file_extension not in allowed_extensions:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported file type.")
-
-    unique_filename = f"{datetime.now(UTC).strftime('%Y%m%d%H%M%S%f')}_{current_user.id}_{file.filename}"
-    file_path_on_disk = current_upload_dir / unique_filename
-
     try:
-        with open(file_path_on_disk, "wb") as buffer:
-            while contents := await file.read(1024):
-                buffer.write(contents)
-
-        image_create_data = shared_schemas.ImageCreate(
-            image_type_id=image_type_id,
-            file_name=unique_filename,
-            file_path=str(file_path_on_disk),
-            file_size_kb=math.ceil(file_path_on_disk.stat().st_size / 1024),
-            mime_type=file.content_type,
-            description=description,
-            uploaded_by_user_id=current_user.id,
-            uploaded_at=datetime.now(UTC),
-            department_id=current_user.department_id  # 업로더의 부서 ID를 이미지에 할당
+        # [추가] 파일의 MIME 타입을 기반으로 리소스 유형을 결정합니다.
+        resource_type = (
+            shared_models.ResourceType.IMAGE
+            if "image" in file.content_type
+            else shared_models.ResourceType.FILE
         )
-        return await shared_crud.image.create(db=db, obj_in=image_create_data)
 
+        #  이제 라우터는 서비스 함수를 호출하는 역할만 합니다.
+        return await shared_services.upload_resource(
+            db=db,
+            upload_file=file,
+            uploader_id=current_user.id,  # 서비스에서 이 객체로부터 id, department_id를 추출
+            department_id=current_user.department_id,
+            resource_type=resource_type,
+            category_id=category_id,
+            description=description
+        )
+    except HTTPException as e:
+        raise e
     except Exception as e:
-        if file_path_on_disk.exists():
-            file_path_on_disk.unlink()
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Image upload failed: {e}")
+        # 디버깅을 위해 실제 에러를 서버 로그에 출력합니다.
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"리소스 업로드에 실패했습니다: {e}"
+        )
 
 
-@router.get("/images", response_model=List[shared_schemas.ImageRead])
-async def read_images(
+@router.get("/resources", response_model=List[shared_schemas.ResourceRead])
+async def read_resources(
     skip: int = 0,
     limit: int = 100,
-    uploaded_by_user_id: Optional[int] = None,
+    uploader_id: Optional[int] = None,
     db: Session = Depends(deps.get_db_session)
 ):
     """
-    모든 이미지 또는 특정 사용자가 업로드한 이미지 목록을 조회합니다.
+    모든 리소스 또는 특정 사용자가 업로드한 리소스 목록을 조회합니다.
     """
-    if uploaded_by_user_id:
-        return await shared_crud.image.get_multi(db, skip=skip, limit=limit, uploaded_by_user_id=uploaded_by_user_id)
+    if uploader_id:
+        return await shared_crud.resource.get_multi(db, skip=skip, limit=limit, uploader_id=uploader_id)
     else:
-        return await shared_crud.image.get_multi(db, skip=skip, limit=limit)
+        return await shared_crud.resource.get_multi(db, skip=skip, limit=limit)
 
 
-@router.get("/images/{image_id}", response_model=shared_schemas.ImageRead)
-async def read_image(
-    image_id: int,
+@router.get("/resources/{resource_id}", response_model=shared_schemas.ResourceRead)
+async def read_resource(
+    resource_id: int,
     db: Session = Depends(deps.get_db_session)
 ):
     """
-    특정 ID의 이미지 정보를 조회합니다.
+    특정 ID의 리소스 정보를 조회합니다.
     """
-    db_image = await shared_crud.image.get(db, id=image_id)
-    if db_image is None:
-        raise HTTPException(status_code=404, detail="Image not found")
-    return db_image
+    db_resource = await shared_crud.resource.get(db, id=resource_id)
+    if db_resource is None:
+        raise HTTPException(status_code=404, detail="Resource not found")
+    return db_resource
 
 
-@router.put("/images/{image_id}", response_model=shared_schemas.ImageRead)
-async def update_image(
-    image_id: int,
-    image_update: shared_schemas.ImageUpdate,
+@router.put(
+    "/resources/{resource_id}",
+    response_model=shared_schemas.ResourceRead
+)
+async def update_resource(
+    resource_id: int,
+    resource_update: shared_schemas.ResourceUpdate,
     db: Session = Depends(deps.get_db_session),
-    current_user: UsrUser = Depends(deps.get_current_active_user)
+    current_user: usr_models.User = Depends(deps.get_current_active_user)
 ):
     """
-    이미지 정보를 업데이트합니다. 소유자, 관리자, 부서원 또는 역할 권한이 필요합니다.
+    리소스 정보를 업데이트합니다. 소유자, 관리자, 부서원 또는 역할 권한이 필요합니다.
     """
-    db_image = await shared_crud.image.get(db, id=image_id)
-    if not db_image:
-        raise HTTPException(status_code=404, detail="Image not found")
+    #  1. 서비스 함수를 호출하여 권한 확인 및 리소스 객체 가져오기
+    db_resource = await shared_services.check_resource_modification_permission(db=db, resource_id=resource_id, user=current_user)
 
-    # 1. 소유자 여부 확인
-    is_owner = db_image.uploaded_by_user_id == current_user.id
-    # 2. 관리자(Admin) 이상 여부 확인
-    is_admin = current_user.role <= UserRole.ADMIN
-    # 3. 같은 부서 소속 여부 확인 (퇴사자 문제 해결)
-    is_in_same_department = db_image.department_id and (db_image.department_id == current_user.department_id)
-
-    # 4. 역할 기반 권한 확인 (RBAC)
-    has_role_permission = False
-    linked_entities = await shared_crud.entity_image.get_by_image_id(db, image_id=db_image.id)
-    if linked_entities:
-        # 이미지가 여러 곳에 연결될 수 있으므로, 첫 번째 연결을 기준으로 검사
-        entity_type = linked_entities[0].entity_type
-        if entity_type == "EQUIPMENT" and current_user.role == UserRole.FACILITY_MANAGER:
-            has_role_permission = True
-        elif entity_type == "MATERIAL" and current_user.role == UserRole.INVENTORY_MANAGER:
-            has_role_permission = True
-        # ... 다른 엔티티/역할에 대한 규칙 추가 가능
-
-    # 최종 권한 판단: 위 조건 중 하나라도 만족하면 통과
-    if not (is_owner or is_admin or is_in_same_department or has_role_permission):
-        raise HTTPException(status_code=403, detail="Not enough permissions to update this image.")
-
-    return await shared_crud.image.update(db=db, db_obj=db_image, obj_in=image_update)
+    #  2. 권한 확인이 통과되면, 업데이트 로직 실행
+    return await shared_crud.resource.update(db=db, db_obj=db_resource, obj_in=resource_update)
 
 
-@router.delete("/images/{image_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_image(
-    image_id: int,
-    db: Session = Depends(deps.get_db_session),
-    current_user: UsrUser = Depends(deps.get_current_active_user)
+@router.delete("/resources/{resource_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_resource(
+    resource_id: int,
+    db: AsyncSession = Depends(deps.get_db_session),
+    current_user: usr_models.User = Depends(deps.get_current_active_user)
 ):
     """
-    이미지 정보 및 파일을 삭제합니다. 소유자, 관리자, 부서원 또는 역할 권한이 필요합니다.
+    리소스 정보 및 파일을 삭제합니다.
+    소유자, 같은 부서원, 또는 관리자만 삭제할 수 있습니다.
     """
-    db_image = await shared_crud.image.get(db, id=image_id)
-    if not db_image:
-        raise HTTPException(status_code=404, detail="Image not found")
+    #  1. 서비스 함수를 호출하여 권한 확인 및 리소스 객체 가져오기
+    db_resource = await shared_services.check_resource_modification_permission(db=db, resource_id=resource_id, user=current_user)
 
-    # update_image와 동일한 권한 확인 로직 적용
-    is_owner = db_image.uploaded_by_user_id == current_user.id
-    is_admin = current_user.role <= UserRole.ADMIN
-    is_in_same_department = db_image.department_id and (db_image.department_id == current_user.department_id)
-
-    has_role_permission = False
-    linked_entities = await shared_crud.entity_image.get_by_image_id(db, image_id=db_image.id)
-    if linked_entities:
-        entity_type = linked_entities[0].entity_type
-        if entity_type == "EQUIPMENT" and current_user.role == UserRole.FACILITY_MANAGER:
-            has_role_permission = True
-        elif entity_type == "MATERIAL" and current_user.role == UserRole.INVENTORY_MANAGER:
-            has_role_permission = True
-
-    if not (is_owner or is_admin or is_in_same_department or has_role_permission):
-        raise HTTPException(status_code=403, detail="Not enough permissions to delete this image.")
-
-    file_path_on_disk = Path(db_image.file_path)
-    if file_path_on_disk.exists():
+    # 2. 권한 확인이 통과되면, 파일 및 DB 레코드 삭제 로직 실행
+    resource_path_on_disk = Path(db_resource.path)
+    if resource_path_on_disk.exists():
         try:
-            file_path_on_disk.unlink()
+            resource_path_on_disk.unlink()
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Failed to delete image file: {e}")
+            raise HTTPException(status_code=500, detail=f"Failed to delete resource: {e}")
 
-    await shared_crud.image.delete(db, id=image_id)
+    await shared_crud.resource.delete(db, id=resource_id)
     return {}
 
 
 # =============================================================================
-# 4. app.entity_images 엔드포인트
+# 4. shared.resources.entity 엔드포인트 entities 복수
 # =============================================================================
-@router.post("/entity_images", response_model=shared_schemas.EntityImageRead, status_code=status.HTTP_201_CREATED)
-async def create_entity_image(
-    entity_image_create: shared_schemas.EntityImageCreate,
+@router.post("/resources/entity", response_model=shared_schemas.EntityResourceRead, status_code=status.HTTP_201_CREATED)
+async def create_entity_resource(
+    entity_resource_create: shared_schemas.EntityResourceCreate,
     db: Session = Depends(deps.get_db_session),
-    current_user: UsrUser = Depends(deps.get_current_active_user)
+    current_user: usr_models.User = Depends(deps.get_current_active_user)
 ):
     """
-    특정 엔티티(설비, 자재 등)에 이미지를 연결합니다.
+    특정 엔티티(설비, 자재 등)에 리소스를 연결합니다.
     """
-    db_image = await shared_crud.image.get(db, id=entity_image_create.image_id)
-    if not db_image:
-        raise HTTPException(status_code=404, detail="Image to link not found.")
+    db_resource = await shared_crud.resource.get(db, id=entity_resource_create.resource_id)
+    if not db_resource:
+        raise HTTPException(status_code=404, detail="Resource to link not found.")
 
-    return await shared_crud.entity_image.create(db=db, obj_in=entity_image_create)
+    return await shared_crud.entity_resource.create(db=db, obj_in=entity_resource_create)
 
 
 @router.get(
-    "/entity_images/by_entity/{entity_type}/{entity_id}",
-    response_model=List[shared_schemas.EntityImageRead],
-    summary="특정 엔티티의 모든 이미지 정보 조회 (상세 이미지 정보 포함)"
+    "/resources/entity/{entity_type}/{entity_id}",
+    response_model=List[shared_schemas.EntityResourceRead],
+    summary="특정 엔티티의 모든 리소스 정보 조회 (상세 리소스 정보 포함)"
 )
-async def read_entity_images_for_entity(
+async def read_entity_resources_for_entity(
     entity_type: str,
     entity_id: int,
     db: Session = Depends(deps.get_db_session)
 ):
     """
-    특정 엔티티(유형과 ID)에 연결된 모든 이미지 정보를 조회합니다.
+    특정 엔티티(유형과 ID)에 연결된 모든 리소스 정보를 조회합니다.
     """
-    return await shared_crud.entity_image.get_by_entity(db, entity_type=entity_type, entity_id=entity_id)
+    return await shared_crud.entity_resource.get_by_entity(db, entity_type=entity_type, entity_id=entity_id)
 
 
-@router.put("/entity_images/{entity_image_id}/set_main", response_model=shared_schemas.EntityImageRead)
-async def set_main_entity_image(
-    entity_image_id: int,
+@router.put("/resources/entity/{entity_resource_id}/set_main", response_model=shared_schemas.EntityResourceRead)
+async def set_main_entity_resource(
+    entity_resource_id: int,
     entity_type: str,
     entity_id: int,
     db: Session = Depends(deps.get_db_session),
-    current_user: UsrUser = Depends(deps.get_current_active_user)
+    current_user: usr_models.User = Depends(deps.get_current_active_user)
 ):
     """
-    특정 엔티티에 대해 연결된 이미지 중 하나를 '대표 이미지'로 설정합니다.
-    기존의 대표 이미지는 해제됩니다. (관리자 권한 필요)
+    특정 엔티티에 대해 연결된 리소스 중 하나를 '대표 리소스'로 설정합니다.
+    기존의 대표 리소스는 해제됩니다. (관리자 권한 필요)
     """
     async with db.begin_nested():
         stmt_unsettle = (
-            update(shared_models.EntityImage)
+            update(shared_models.EntityResource)
             .where(
-                shared_models.EntityImage.entity_type == entity_type,
-                shared_models.EntityImage.entity_id == entity_id,
-                shared_models.EntityImage.is_main_image
+                shared_models.EntityResource.entity_type == entity_type,
+                shared_models.EntityResource.entity_id == entity_id,
+                shared_models.EntityResource.is_main
             )
-            .values(is_main_image=False)
+            .values(is_main=False)
         )
         await db.execute(stmt_unsettle)
 
-        target_link = await shared_crud.entity_image.get(db, id=entity_image_id)
+        target_link = await shared_crud.entity_resource.get(db, id=entity_resource_id)
         if not target_link or target_link.entity_type != entity_type or target_link.entity_id != entity_id:
-            raise HTTPException(status_code=404, detail="Entity-image link not found or does not match entity.")
+            raise HTTPException(status_code=404, detail="Entity-resource link not found or does not match entity.")
 
-        target_link.is_main_image = True
+        target_link.is_main = True
         db.add(target_link)
 
     await db.refresh(target_link)
     return target_link
 
 
-@router.delete("/entity_images/{entity_image_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_entity_image(
-    entity_image_id: int,
+@router.delete("/resources/entity/{entity_resource_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_entity_resource(
+    entity_resource_id: int,
     db: Session = Depends(deps.get_db_session),
-    current_user: UsrUser = Depends(deps.get_current_active_user)
+    current_user: usr_models.User = Depends(deps.get_current_active_user)
 ):
     """
-    특정 엔티티와 이미지 간의 연결 정보를 삭제합니다. (실제 이미지는 삭제되지 않음) (관리자 권한 필요)
+    특정 엔티티와 리소스 간의 연결 정보를 삭제합니다. (실제 리소스는 삭제되지 않음) (관리자 권한 필요)
     """
-    db_entity_image = await shared_crud.entity_image.get(db, id=entity_image_id)
-    if db_entity_image is None:
-        raise HTTPException(status_code=404, detail="Entity image link not found")
+    db_entity_resource = await shared_crud.entity_resource.get(db, id=entity_resource_id)
+    if db_entity_resource is None:
+        raise HTTPException(status_code=404, detail="Entity resource link not found")
 
-    await shared_crud.entity_image.delete(db, id=entity_image_id)
+    await shared_crud.entity_resource.delete(db, id=entity_resource_id)
     return {}
-
-
-# ====================================================================
-# 5. File Upload End Pointer
-# ====================================================================
-# ==============================================================================
-# 파일(File) 관련 라우트 (이 부분을 추가)
-# ==============================================================================
-
-@router.post("/files/upload", response_model=shared_schemas.FileUploadResponse, status_code=201)
-async def upload_file(
-    *,
-    session: Session = Depends(deps.get_db_session),
-    current_user: UsrUser = Depends(deps.get_current_active_user),
-    upload_file: UploadFile = File(...)
-):
-    # """
-    # 파일을 서버에 업로드하고 데이터베이스에 메타데이터를 저장합니다.
-    # """
-    # try:
-    #     db_file = await shared_crud.file.create_file(
-    #         db=db, file=upload_file, user_id=current_user.id
-    #     )
-    #     # 파일 접근 URL 생성 (필요에 따라 수정)
-    #     file_url = f"/api/v1/shared/files/download/{db_file.id}"
-
-    #     # --- 반환하는 딕셔너리의 키를 수정합니다 ---
-    #     return {
-    #         "id": db_file.id,  # 'file_id' -> 'id'로 수정
-    #         "url": file_url,    # 'file_url' -> 'url'로 수정
-    #         "message": "File uploaded successfully."
-    #     }
-    # except Exception as e:
-    #     raise HTTPException(status_code=500, detail=f"File could not be uploaded: {e}")
-    """
-    파일을 서버에 업로드하고 메타데이터를 DB에 저장합니다.
-    모든 파일 업로드 로직은 shared_services.upload_file를 호출하여 처리합니다.
-    """
-    try:
-        #  1. 서비스 레이어에 파일 저장을 위임합니다.
-        db_file = await shared_services.upload_file(
-            db=session, upload_file=upload_file, uploader_id=current_user.id
-        )
-
-        #  2. 서비스 레이어에서 URL 생성 함수를 호출합니다.
-        file_url = shared_services.create_file_download_url(db_file.id)
-
-        return {
-            "id": db_file.id,
-            "name": db_file.name,
-            "url": file_url,
-            "content_type": db_file.content_type,
-            "size": db_file.size,
-            "message": "File uploaded successfully.",
-        }
-    except HTTPException as e:
-        #  서비스에서 발생한 HTTPException을 그대로 전달합니다.
-        raise e
-    except Exception as e:
-        #  그 외 예상치 못한 오류를 처리합니다.
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"파일을 업로드하지 못했습니다: {e}",
-        )
-
-
-@router.get(
-    "/download/{file_id}",
-    summary="파일 다운로드",
-    response_class=FileResponse
-)
-async def download_file(
-    file_id: int, session: AsyncSession = Depends(deps.get_db_session)
-):
-    """
-    ID를 사용하여 저장된 파일을 다운로드합니다.
-    """
-    db_file = await shared_crud.file.get(db=session, id=file_id)
-    if not db_file:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="File not found"
-        )
-
-    #  파일 경로의 유효성을 확인합니다.
-    if not os.path.exists(db_file.path):
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="File not found on disk"
-        )
-
-    return FileResponse(path=db_file.path, filename=db_file.name)
-
-
-@router.get("/files/{file_id}", response_model=shared_schemas.FileRead)
-async def read_file_metadata(
-    *,
-    db: Session = Depends(deps.get_db_session),
-    file_id: int,
-    current_user: UsrUser = Depends(deps.get_current_active_user),
-):
-    """
-    파일의 메타데이터를 조회합니다.
-    """
-    db_file = await shared_crud.file.get_file(db=db, file_id=file_id)
-    if not db_file:
-        raise HTTPException(status_code=404, detail="File not found.")
-    return db_file

@@ -287,10 +287,10 @@ async def test_delete_image_success_admin(
     # DB 레코드 생성
     image_data = shared_models.Image(
         image_type_id=img_type.id,
-        file_name=os.path.basename(temp_file_path),
-        file_path=str(temp_file_path),
-        file_size_kb=len(test_content) // 1024,
-        mime_type="text/plain",
+        name=os.path.basename(temp_file_path),
+        path=str(temp_file_path),
+        size=len(test_content) // 1024,
+        content_type="text/plain",
         description="삭제될 이미지",
         uploaded_by_user_id=test_user.id,
         uploaded_at=datetime.now()

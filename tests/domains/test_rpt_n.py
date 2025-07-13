@@ -4,29 +4,46 @@
 보고서 양식의 CRUD, 권한, 유효성 검사 등을 테스트합니다.
 """
 import pytest
+import pytest_asyncio  # @pytest.mark.asyncio 데코레이터 및 비동기 픽스처 사용 시 필요
 from httpx import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 from io import BytesIO
 
+from app.domains.shared import models as shared_models
+
 #  API 경로 정의
 REPORT_API_PREFIX = "/api/v1/rpt"
-UPLOAD_API_PREFIX = "/api/v1/shared/files/upload"
+UPLOAD_API_PREFIX = "/api/v1/shared/resources"
+
+
+@pytest_asyncio.fixture
+async def test_resource_category_for_rpt(db_session: AsyncSession) -> shared_models.ResourceCategory:
+    """테스트용 리소스 카테고리를 생성하는 픽스처"""
+    category = shared_models.ResourceCategory(name="테스트 카테고리", description="테스트용입니다.")
+    db_session.add(category)
+    await db_session.commit()
+    await db_session.refresh(category)
+    return category
 
 
 @pytest.fixture(scope="function")
-async def test_report_template_file(admin_client: AsyncClient) -> int:
+async def test_report_template_file(
+    admin_client: AsyncClient,
+    test_resource_category_for_rpt: shared_models.ResourceCategory
+) -> int:
     """
     테스트에 사용할 보고서 양식 파일을 미리 업로드하고 파일 ID를 반환하는 픽스처입니다.
     """
     file_content = b"this is a dummy excel file content"
     files = {
-        "upload_file": (
+        "file": (
             "fixture_report.xlsx",
             BytesIO(file_content),
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
     }
-    upload_response = await admin_client.post(UPLOAD_API_PREFIX, files=files)
+    data = {"category_id": test_resource_category_for_rpt.id, "description": "테스트 업로드"}
+    upload_response = await admin_client.post(UPLOAD_API_PREFIX, files=files, data=data)
     assert upload_response.status_code == 201
     return upload_response.json()["id"]
 
@@ -147,6 +164,7 @@ async def test_create_report_form_permission_denied(
 
     #  When & Then: 생성 요청 시 403 오류가 발생해야 합니다.
     response = await authorized_client.post(f"{REPORT_API_PREFIX}/", json=form_data)
+    print(f"DEBUG IN TEST: Response status code: {response.status_code}, Response text: {response.text}")
     assert response.status_code == 403
 
 

@@ -47,9 +47,9 @@ class DepartmentRead(DepartmentBase):
 # =============================================================================
 class UserBase(SQLModel):
     """사용자 정보의 기본 필드를 정의하는 스키마"""
-    username: str = Field(..., max_length=50)
+    user_id: str = Field(..., max_length=50)
     email: Optional[EmailStr] = Field(None, max_length=100)
-    full_name: Optional[str] = Field(None, max_length=100)
+    name: Optional[str] = Field(None, max_length=100)
     department_id: Optional[int] = None
     role: usr_models.UserRole = Field(default=usr_models.UserRole.GENERAL_USER, description="사용자 역할")
     code: Optional[str] = Field(None, max_length=16)
@@ -64,7 +64,7 @@ class UserCreate(UserBase):
 class UserUpdate(SQLModel):
     """사용자 정보 수정을 위한 스키마"""
     email: Optional[EmailStr] = None
-    full_name: Optional[str] = None
+    name: Optional[str] = None
     department_id: Optional[int] = None
     role: Optional[usr_models.UserRole] = None
     code: Optional[str] = None

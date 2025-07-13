@@ -8,9 +8,10 @@
 from typing import List  # , Optional
 from datetime import timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query
-from fastapi.security import OAuth2PasswordRequestForm
 from sqlmodel.ext.asyncio.session import AsyncSession
+
+from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi.security import OAuth2PasswordRequestForm, OAuth2PasswordBearer
 
 # 애플리케이션 설정 및 의존성 임포트
 from app.core.config import settings
@@ -22,6 +23,8 @@ from . import crud as usr_crud
 from . import models as usr_models
 from . import schemas as usr_schemas
 
+from app import API_PREFIX
+oauth2_scheme_usr = OAuth2PasswordBearer(tokenUrl=f"{API_PREFIX}/usr/auth/token")
 
 # 라우터 인스턴스 생성 (prefix는 main.py에서 관리하므로 제거)
 router = APIRouter(
@@ -40,19 +43,19 @@ async def login_for_access_token(
     db: AsyncSession = Depends(get_session),
 ):
     user = await usr_crud.user.authenticate(
-        db, username=form_data.username, password=form_data.password
+        db, user_id=form_data.username, password=form_data.password
     )
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username or password",
+            detail="Incorrect user id or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
     if not user.is_active:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Inactive user")
 
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = deps.create_access_token(data={"sub": user.username}, expires_delta=access_token_expires)
+    access_token = deps.create_access_token(data={"sub": user.user_id}, expires_delta=access_token_expires)
     return {"access_token": access_token, "token_type": "bearer"}
 
 
@@ -69,6 +72,7 @@ async def read_users_me(current_user: usr_models.User = Depends(deps.get_current
 async def create_department(
     department: usr_schemas.DepartmentCreate,
     db: AsyncSession = Depends(get_session),
+    token: str = Depends(oauth2_scheme_usr),
     current_admin_user: usr_models.User = Depends(deps.get_current_admin_user),
 ):
     return await usr_crud.department.create(db, obj_in=department)
@@ -233,7 +237,7 @@ async def update_user(
 async def delete_user(
     user_id: int,
     db: AsyncSession = Depends(get_session),
-    current_superuser: usr_models.User = Depends(deps.get_current_superuser),
+    current_superuser: usr_models.User = Depends(deps.get_current_admin_user),
 ):
     """
     ID로 사용자를 삭제합니다. 최고 관리자(Superuser) 권한이 필요합니다.

@@ -82,12 +82,12 @@ class CRUDUser(CRUDBase[usr_models.User, usr_schemas.UserCreate, usr_schemas.Use
     def __init__(self):
         super().__init__(model=usr_models.User)
 
-    async def get_by_username(self, db: AsyncSession, *, username: str) -> Optional[usr_models.User]:
+    async def get_by_user_id(self, db: AsyncSession, *, user_id: str) -> Optional[usr_models.User]:
         """사용자명으로 사용자를 조회합니다."""
-        # statement = select(self.model).where(self.model.username == username)
+        # statement = select(self.model).where(self.model.user_id == username)
         # result = await db.execute(statement)
         # return result.scalars().one_or_none()
-        return await self.get_by_attribute(db, attribute="username", value=username)
+        return await self.get_by_attribute(db, attribute="user_id", value=user_id)
 
     async def get_by_email(self, db: AsyncSession, *, email: str) -> Optional[usr_models.User]:
         """이메일로 사용자를 조회합니다."""
@@ -98,7 +98,7 @@ class CRUDUser(CRUDBase[usr_models.User, usr_schemas.UserCreate, usr_schemas.Use
 
     async def create(self, db: AsyncSession, *, obj_in: usr_schemas.UserCreate) -> usr_models.User:
         """새로운 사용자를 생성하며 비밀번호를 해싱하고 중복을 검사합니다."""
-        if await self.get_by_username(db, username=obj_in.username):
+        if await self.get_by_user_id(db, user_id=obj_in.user_id):
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Username already registered")
         if obj_in.email and await self.get_by_email(db, email=obj_in.email):
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already registered")
@@ -112,9 +112,9 @@ class CRUDUser(CRUDBase[usr_models.User, usr_schemas.UserCreate, usr_schemas.Use
         await db.refresh(db_user)
         return db_user
 
-    async def authenticate(self, db: AsyncSession, *, username: str, password: str) -> Optional[usr_models.User]:
+    async def authenticate(self, db: AsyncSession, *, user_id: str, password: str) -> Optional[usr_models.User]:
         """사용자명과 비밀번호를 사용하여 사용자를 인증합니다."""
-        user = await self.get_by_username(db, username=username)
+        user = await self.get_by_user_id(db, user_id=user_id)
         if not user:
             return None
         if not verify_password(password, user.password_hash):
@@ -130,10 +130,10 @@ class CRUDUser(CRUDBase[usr_models.User, usr_schemas.UserCreate, usr_schemas.Use
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
         # [수정] 최고 관리자 계정 (role=1) 대신 Enum을 사용합니다.
-        if user_to_delete.role == usr_models.UserRole.SUPERUSER:
+        if user_to_delete.role == usr_models.UserRole.ADMIN:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Cannot delete a superuser account directly."
+                detail="Cannot delete a admin account directly."
             )
 
         return await super().delete(db, id=id)  # CRUDBase의 실제 삭제 로직 호출
@@ -143,23 +143,23 @@ class CRUDUser(CRUDBase[usr_models.User, usr_schemas.UserCreate, usr_schemas.Use
         사용자 정보를 업데이트합니다. 최고 관리자 계정의 역할 변경 및 비활성화를 방지합니다.
         """
         # [수정] 최고 관리자 계정 (role=1) 대신 Enum을 사용합니다.
-        if db_obj.role == usr_models.UserRole.SUPERUSER:
-            if obj_in.role is not None and obj_in.role != usr_models.UserRole.SUPERUSER:
+        if db_obj.role == usr_models.UserRole.ADMIN:
+            if obj_in.role is not None and obj_in.role != usr_models.UserRole.ADMIN:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Cannot change the role of a superuser account."
+                    detail="Cannot change the role of a admin account."
                 )
             if obj_in.is_active is False:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Cannot deactivate a superuser account."
+                    detail="Cannot deactivate a admin account."
                 )
         # 다른 역할의 사용자가 최고 관리자(role=1)로 변경되는 것을 방지
         # (이 로직은 router에서 권한 검증에 의해 대부분 커버되지만, CRUD단에서도 한 번 더 방어 가능)
-        elif db_obj.role != usr_models.UserRole.SUPERUSER and obj_in.role == usr_models.UserRole.SUPERUSER:
+        elif db_obj.role != usr_models.UserRole.ADMIN and obj_in.role == usr_models.UserRole.ADMIN:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,  # 또는 400, 하지만 권한 문제에 더 가까움
-                detail="Only a superuser can create or promote to another superuser."
+                detail="Only a admin can create or promote to another admin."
             )
 
         return await super().update(db, db_obj=db_obj, obj_in=obj_in)

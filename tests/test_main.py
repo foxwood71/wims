@@ -30,7 +30,7 @@ def test_read_root(client: TestClient):
     print("test_read_root passed.")
 
 
-@pytest.mark.asyncio # 비동기 픽스처를 사용하는 테스트 함수에 필요 (pytest-asyncio)
+@pytest.mark.asyncio  # 비동기 픽스처를 사용하는 테스트 함수에 필요 (pytest-asyncio)
 async def test_health_check(client: TestClient):
     """
     헬스 체크 엔드포인트 (`GET /health-check`)가 데이터베이스 연결 상태를 올바르게 반환하는지 테스트합니다.

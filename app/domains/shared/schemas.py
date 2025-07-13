@@ -12,9 +12,12 @@ from datetime import datetime, date
 from pydantic import BaseModel, Field, computed_field  # noqa:F401 BaseModel도 명시적으로 임포트
 from sqlmodel import SQLModel  # SQLModel 클래스 임포트
 
+from .models import ResourceType
+from app.domains.usr.schemas import UserRead
+
 
 # =============================================================================
-# 1. app.versions 테이블 스키마
+# 1. shared.versions 테이블 스키마
 # =============================================================================
 class VersionBase(SQLModel):
     """
@@ -60,35 +63,35 @@ class VersionRead(VersionBase):
 
 
 # =============================================================================
-# 2. app.image_types 테이블 스키마
+# 2. shared.ResourceCategory 테이블 스키마
 # =============================================================================
-class ImageTypeBase(SQLModel):
+class ResourceCategoryBase(SQLModel):
     """
-    이미지 유형의 기본 속성을 정의하는 Pydantic/SQLModel Base 스키마입니다.
+    리소스 유형의 기본 속성을 정의하는 Pydantic/SQLModel Base 스키마입니다.
     """
-    name: str = Field(..., max_length=100, description="이미지 유형 명칭 (예: 설비 사진, 도면)")
-    description: Optional[str] = Field(None, description="이미지 유형에 대한 설명")
+    name: str = Field(..., max_length=100, description="리소스 유형 명칭 (예: 설비 사진, 도면)")
+    description: Optional[str] = Field(None, description="리소스 유형에 대한 설명")
 
 
-class ImageTypeCreate(ImageTypeBase):
+class ResourceCategoryCreate(ResourceCategoryBase):
     """
-    새로운 이미지 유형을 생성하기 위한 Pydantic 모델입니다.
+    새로운 리소스 유형을 생성하기 위한 Pydantic 모델입니다.
     """
     pass
 
 
-class ImageTypeUpdate(ImageTypeBase):
+class ResourceCategoryUpdate(ResourceCategoryBase):
     """
-    기존 이미지 유형을 업데이트하기 위한 Pydantic 모델입니다.
+    기존 리소스 유형을 업데이트하기 위한 Pydantic 모델입니다.
     """
-    name: Optional[str] = Field(None, max_length=100, description="이미지 유형 명칭")
+    name: Optional[str] = Field(None, max_length=100, description="리소스 유형 명칭")
 
 
-class ImageTypeRead(ImageTypeBase):
+class ResourceCategoryRead(ResourceCategoryBase):
     """
-    이미지 유형 정보를 클라이언트에 응답하기 위한 Pydantic 모델입니다.
+    리소스 유형 정보를 클라이언트에 응답하기 위한 Pydantic 모델입니다.
     """
-    id: int = Field(..., description="이미지 유형 고유 ID")
+    id: int = Field(..., description="리소스 유형 고유 ID")
     created_at: datetime = Field(..., description="레코드 생성 일시")
     updated_at: datetime = Field(..., description="레코드 마지막 업데이트 일시")
 
@@ -97,164 +100,126 @@ class ImageTypeRead(ImageTypeBase):
 
 
 # =============================================================================
-# 3. app.images 테이블 스키마
+# 3. shared.Resource 테이블 스키마
 # =============================================================================
-class ImageBase(SQLModel):
+class ResourceBase(SQLModel):
     """
-    업로드된 이미지의 기본 속성을 정의하는 Pydantic/SQLModel Base 스키마입니다.
+    업로드된 리소스의 기본 속성을 정의하는 Pydantic/SQLModel Base 스키마입니다.
     """
-    image_type_id: Optional[int] = Field(None, description="이미지 유형 ID (FK)")
-    # file_name과 file_path는 실제 파일 업로드 시에만 필요하거나 백엔드에서 생성되므로
-    # ImageCreate에서는 별도로 처리될 수 있습니다. 여기서는 모델의 기본 속성으로 정의.
-    file_name: Optional[str] = Field(None, max_length=255, description="저장된 파일 이름")
-    file_path: Optional[str] = Field(None, max_length=255, description="서버 내 파일 저장 경로")
-    file_size_kb: Optional[int] = Field(None, description="파일 크기 (KB)")
-    mime_type: Optional[str] = Field(None, max_length=50, description="파일 MIME 타입")
-    description: Optional[str] = Field(None, description="이미지에 대한 설명")
-    uploaded_by_user_id: Optional[int] = Field(None, description="이미지를 업로드한 사용자 ID (FK)")
-    uploaded_at: Optional[datetime] = Field(None, description="이미지 업로드 일시")
-    department_id: Optional[int] = Field(None, description="이미지 소유 부서")
+    type: ResourceType = Field(..., description="리소스 유형 (IMAGE, FILE 등)")
+    category_id: int = Field(..., description="리소스 유형 ID (FK)")
+    name: Optional[str] = Field(None, max_length=255, description="리소스 명칭")
+    size_kb: Optional[int] = Field(None, description="리소스 크기 (KB)")
+    content_type: Optional[str] = Field(None, max_length=255, description="리소스 MIME 타입")
+    path: Optional[str] = Field(None, max_length=255, description="서버 상대 경로 (고유 리소스명)")
+    description: Optional[str] = Field(None, description="리소스 설명")
+    uploader_id: Optional[int] = Field(None, description="리소스를 업로드한 사용자 ID (FK)")
+    uploaded_at: Optional[datetime] = Field(None, description="리소스 업로드 일시")
+    department_id: Optional[int] = Field(None, description="리소스 소유 부서")
 
 
-class ImageCreate(ImageBase):
+class ResourceCreate(ResourceBase):
     """
-    새로운 이미지를 업로드하고 데이터베이스에 기록하기 위한 Pydantic 모델입니다.
+    새로운 리소스를 업로드하고 데이터베이스에 기록하기 위한 Pydantic 모델입니다.
     클라이언트가 직접 파일 이름을 지정하지 않으므로 Optional로 두거나,
     라우터에서 동적으로 생성합니다.
     """
-    # file_name, file_path, file_size_kb, mime_type, uploaded_at 등은
-    # FastAPI의 UploadFile 객체로부터 백엔드에서 직접 추출/생성되므로
-    # 클라이언트가 요청 본문에 포함할 필요가 없습니다.
-    # 따라서 ImageCreate 스키마에는 이들을 Optional로 두거나 제외할 수 있습니다.
-    # 여기서는 ORM 모델과의 일관성을 위해 Base에서 그대로 상속받고,
-    # 라우터에서 필요한 필드만 채워넣는 방식으로 사용합니다.
-    file_name: str
-    file_path: str
-    file_size_kb: int
-    mime_type: str
-    uploaded_by_user_id: int
+    type: ResourceType
+    category_id: int
+    name: str
+    path: str
+    size_kb: int
+    content_type: str
+    uploader_id: int
+    department_id: int
     uploaded_at: datetime
+    pass
 
 
-class ImageUpdate(ImageBase):
+# [수정] ResourceBase 상속을 제거하고, 독립적인 SQLModel로 변경합니다.
+class ResourceUpdate(SQLModel):
     """
-    기존 이미지 정보를 업데이트하기 위한 Pydantic 모델입니다.
-    모든 필드는 선택 사항입니다 (부분 업데이트 가능).
+    기존 리소스 정보를 업데이트하기 위한 Pydantic 모델입니다.
+    모든 필드는 선택 사항이어야 합니다 (부분 업데이트).
     """
-    # file_name, file_path 등은 업데이트 시 변경되지 않아야 하므로 제외하거나
-    # 모델에서 Field(...)로 default=None을 명시적으로 사용합니다.
-    image_type_id: Optional[int] = None
+    category_id: Optional[int] = None
     description: Optional[str] = None
     department_id: Optional[int] = None
 
 
-class ImageRead(ImageBase):
+class ResourceRead(ResourceBase):
     """
-    업로드된 이미지 정보를 클라이언트에 응답하기 위한 Pydantic 모델입니다.
+    업로드된 리소스 정보를 클라이언트에 응답하기 위한 Pydantic 모델입니다.
     """
-    id: int = Field(..., description="이미지 고유 ID")
-    file_name: Optional[str] = Field(None, max_length=255, description="저장된 파일 이름")
-    file_path: Optional[str] = Field(None, max_length=255, description="서버 내 파일 저장 경로")
-    file_size_kb: Optional[int] = Field(None, description="파일 크기 (KB)")
-    mime_type: Optional[str] = Field(None, max_length=50, description="파일 MIME 타입")
-    uploaded_by_user_id: Optional[int] = Field(None, description="이미지를 업로드한 사용자 ID (FK)")
-    uploaded_at: Optional[datetime] = Field(None, description="이미지 업로드 일시")
+    id: int = Field(..., description="리소스 고유 ID")
     created_at: datetime = Field(..., description="레코드 생성 일시")
     updated_at: datetime = Field(..., description="레코드 마지막 업데이트 일시")
-
-    class Config:
-        from_attributes = True
-
-
-# =============================================================================
-# 4. app.entity_images 테이블 스키마
-# =============================================================================
-class EntityImageBase(SQLModel):
-    """
-    엔티티와 이미지 간의 연결 기본 속성을 정의하는 Pydantic/SQLModel Base 스키마입니다.
-    """
-    image_id: int = Field(..., description="연결할 이미지 ID (필수)")
-    entity_type: str = Field(..., max_length=50, description="연결된 엔티티 유형 (예: EQUIPMENT, MATERIAL, LOCATION)")
-    entity_id: int = Field(..., description="연결된 엔티티의 ID")
-    is_main_image: bool = Field(False, description="해당 엔티티의 대표 이미지 여부")
-
-
-class EntityImageCreate(EntityImageBase):
-    """
-    새로운 엔티티-이미지 연결을 생성하기 위한 Pydantic 모델입니다.
-    """
-    pass
-
-
-class EntityImageUpdate(EntityImageBase):
-    """
-    기존 엔티티-이미지 연결 정보를 업데이트하기 위한 Pydantic 모델입니다.
-    """
-    image_id: Optional[int] = Field(None, description="연결할 이미지 ID")
-    entity_type: Optional[str] = Field(None, max_length=50, description="연결된 엔티티 유형")
-    entity_id: Optional[int] = Field(None, description="연결된 엔티티의 ID")
-    is_main_image: Optional[bool] = Field(None, description="해당 엔티티의 대표 이미지 여부")
-
-
-class EntityImageRead(EntityImageBase):
-    """
-    엔티티-이미지 연결 정보를 클라이언트에 응답하기 위한 Pydantic 모델입니다.
-    """
-    id: int = Field(..., description="연결 고유 ID")
-    created_at: datetime = Field(..., description="레코드 생성 일시")
-    updated_at: datetime = Field(..., description="레코드 마지막 업데이트 일시")
-    image: Optional[ImageRead] = Field(None, description="연결된 이미지 상세 정보")
-
-    class Config:
-        from_attributes = True
-
-
-# ==============================================================================
-# 5. app.files 테이블 스키마
-# ==============================================================================
-class FileBase(BaseModel):
-    """
-    파일의 기본 정보 스키마입니다.
-    """
-    name: str = Field(..., max_length=255, description="원본 파일 이름")
-    content_type: str = Field(..., max_length=255, description="파일의 MIME 타입")
-    size: int = Field(..., gt=0, description="파일 크기 (bytes)")
-
-
-class FileUploadResponse(BaseModel):
-    """
-    파일 업로드 성공 시 반환되는 정보입니다.
-    """
-    id: int = Field(..., description="저장된 파일의 고유 ID")
-    url: str = Field(..., description="파일에 접근할 수 있는 URL")
-    message: str = Field(default="File uploaded successfully.", description="성공 메시지")
-
-
-class FileRead(FileBase):
-    """
-    파일 정보 조회 시 반환되는 전체 스키마입니다.
-    """
-    id: int = Field(..., description="파일 고유 ID")
-    name: str = Field(..., description="원본 파일 이름")
-    # path: str = Field(..., description="서버에 저장된 파일의 상대 경로")
-    content_type: str
-    size: int = Field(..., description="파일 크기 (bytes)")
-    created_at: datetime = Field(..., description="생성 일시")
-    updated_at: Optional[datetime] = Field(None, description="마지막 수정 일시")
-    uploaded_by_user_id: Optional[int] = Field(None, description="파일을 업로드한 사용자 ID (FK)")
-    department_id: Optional[int] = Field(None, description="파일 소유 부서")
 
     @computed_field
     @property
     def url(self) -> str:
-        """
-        파일 ID를 이용해 다운로드 URL을 동적으로 생성합니다.
-        """
-        return f"/api/v1/shared/files/download/{self.id}"
+        """파일 ID를 이용해 다운로드 URL을 동적으로 생성합니다."""
+        return f"/api/v1/shared/resources/{self.id}"
 
     class Config:
-        from_attributes = True  # ORM 모델을 Pydantic 모델로 변환 (v2부터 이름 변경)
+        from_attributes = True
+
+    # 관계된 객체의 상세 정보도 함께 보여주기 위해 추가
+    category: Optional[ResourceCategoryRead] = None
+    uploader: Optional[UserRead] = None  # UserRead 스키마 필요
 
 
-class FileCreate(FileBase):
+# =============================================================================
+# 4. shared.entity_resource 테이블 스키마
+# =============================================================================
+class EntityResourceBase(SQLModel):
+    """
+    엔티티와 리소스 간의 연결 기본 속성을 정의하는 Pydantic/SQLModel Base 스키마입니다.
+    """
+    resource_id: int = Field(..., description="연결할 리소스 ID (필수)")
+    entity_type: str = Field(..., max_length=50, description="연결된 엔티티 유형 (예: EQUIPMENT, MATERIAL, LOCATION)")
+    entity_id: int = Field(..., description="연결된 엔티티의 ID")
+    is_main: bool = Field(False, description="해당 엔티티의 대표 리소스 여부")
+
+
+class EntityResourceCreate(EntityResourceBase):
+    """
+    새로운 엔티티-리소스 연결을 생성하기 위한 Pydantic 모델입니다.
+    """
     pass
+
+
+class EntityResourceUpdate(EntityResourceBase):
+    """
+    기존 엔티티-리소스 연결 정보를 업데이트하기 위한 Pydantic 모델입니다.
+    엔티티-리소스 연결 업데이트용 스키마 (is_main만 변경)
+    """
+    is_main: bool
+
+
+class EntityResourceRead(EntityResourceBase):
+    """
+    엔티티-리소스 연결 정보를 클라이언트에 응답하기 위한 Pydantic 모델입니다.
+    """
+    id: int = Field(..., description="연결 고유 ID")
+    created_at: datetime = Field(..., description="레코드 생성 일시")
+    updated_at: datetime = Field(..., description="레코드 마지막 업데이트 일시")
+
+    # 연결된 리소스의 상세 정보를 함께 반환
+    resource: ResourceRead
+
+    class Config:
+        from_attributes = True
+
+
+# =============================================================================
+# 4. 파일 업로드 응답 전용 스키마
+# =============================================================================
+class ResourceUploadResponse(BaseModel):
+    """
+    파일/이미지 업로드 성공 시 클라이언트에 반환되는 정보입니다.
+    테스트 코드 및 프론트엔드의 요구사항에 맞춤.
+    """
+    id: int = Field(..., description="저장된 리소스의 고유 ID")
+    url: str = Field(..., description="리소스에 접근(다운로드)할 수 있는 URL")
+    message: str = Field(default="Resource uploaded successfully.", description="성공 메시지")

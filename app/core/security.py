@@ -20,7 +20,7 @@ from sqlmodel import Session, select
 
 from app.core.config import settings  # 애플리케이션 설정
 from app.core.database import get_session  # 데이터베이스 세션 의존성
-from app.domains.usr.models import User as UsrUser  # 사용자 모델 임포트 (충돌 방지를 위해 별칭 사용)
+from app.domains.usr import models as usr_models  # 사용자 모델 임포트 (충돌 방지를 위해 별칭 사용)
 
 # API_PREFIX를 가져오기 위해 app/__init__.py 또는 main.py에서 정의된 API_PREFIX를 사용해야 합니다.
 # 만약 app/__init__.py에 정의되어 있다면:
@@ -94,7 +94,7 @@ def create_refresh_token(data: dict, expires_delta: Optional[timedelta] = None) 
 async def get_current_user_from_token(
     token: str = Depends(oauth2_scheme),
     db: Session = Depends(get_session),
-) -> UsrUser:
+) -> usr_models.User:
     """
     JWT 토큰을 디코딩하고 검증하여 현재 사용자를 데이터베이스에서 가져옵니다.
     """
@@ -105,29 +105,29 @@ async def get_current_user_from_token(
     )
     try:
         payload = jwt.decode(token, settings.SECRET_KEY.get_secret_value(), algorithms=[settings.ALGORITHM])
-        username: str = payload.get("sub")
-        if username is None:
+        user_id: str = payload.get("sub")
+        if user_id is None:
             raise credentials_exception
-        token_data = username
+        token_data = user_id
     except JWTError as e:
         print(f"DEBUG: JWTError: {e}")
         raise credentials_exception
 
     # 데이터베이스에서 사용자 조회
-    statement = select(UsrUser).where(UsrUser.username == token_data)
+    statement = select(usr_models.User).where(usr_models.User.user_id == token_data)
     result = await db.execute(statement)
     user = result.scalars().one_or_none()
     if user is None:
         raise credentials_exception
-    print(f"DEBUG: Current user: {user.username} (ID: {user.id})")
+    print(f"DEBUG: Current user: {user.user_id} (ID: {user.id})")
     return user
 
 
 # --- 역할 기반 권한 부여 의존성 ---
 
 def get_current_active_user(
-    current_user: UsrUser = Depends(get_current_user_from_token),
-) -> UsrUser:
+    current_user: usr_models.User = Depends(get_current_user_from_token),
+) -> usr_models.User:
     """
     현재 인증된 활성 사용자를 반환합니다.
     계정이 비활성화된 경우 400 Bad Request를 발생시킵니다.
@@ -138,34 +138,46 @@ def get_current_active_user(
 
 
 def get_current_admin_user(
-    current_user: UsrUser = Depends(get_current_user_from_token),
-) -> UsrUser:
+    # current_user: usr_models.User = Depends(get_current_user_from_token), ==> 이제까지 오류의 원인 token으로 받아서 꼬인거임 ㅜ.ㅜ
+    current_user: usr_models.User = Depends(get_current_active_user),
+) -> usr_models.User:
     """
     현재 인증된 관리자 사용자를 반환합니다 (role <= 10).
     관리자 권한이 없는 경우 403 Forbidden을 발생시킵니다.
     """
+    print(f"DEBUG: get_current_admin_user called for user_id: {current_user.user_id}")
+    print(f"DEBUG: current_user.role: {current_user.role} (value: {current_user.role.value})")
+    print(f"DEBUG: usr_models.UserRole.ADMIN: {usr_models.UserRole.ADMIN} (value: {usr_models.UserRole.ADMIN.value})")
+
+    # allowed_roles = [usr_models.UserRole.ADMIN, usr_models.UserRole.LAB_MANAGER,
+    #                 usr_models.UserRole.FACILITY_MANAGER, usr_models.UserRole.INVENTORY_MANAGER]
+
+    allowed_roles = [usr_models.UserRole.ADMIN]
+
     if not current_user.is_active:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Inactive user")
-    if current_user.role > 10:  # role 1 (최고관리자), 10 (관리자)
+    if current_user.role not in allowed_roles:
+        print(f"DEBUG: Role '{current_user.role.name}' is NOT in allowed roles. Raising 403.")
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not enough permissions. Admin role required."
         )
+    print(f"DEBUG: Role '{current_user.role.name}' IS in allowed roles. Proceeding.")
     return current_user
 
 
-def get_current_superuser(
-    current_user: UsrUser = Depends(get_current_user_from_token),
-) -> UsrUser:
-    """
-    현재 인증된 최고 관리자 사용자를 반환합니다 (role == 1).
-    최고 관리자 권한이 없는 경우 403 Forbidden을 발생시킵니다.
-    """
-    if not current_user.is_active:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Inactive user")
-    if current_user.role != 1:  # role 1 (최고관리자)
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not enough permissions. Superuser role required."
-        )
-    return current_user
+# def get_current_superuser(
+#     current_user: usr_models.User = Depends(get_current_user_from_token),
+# ) -> usr_models.User:
+#     """
+#     현재 인증된 최고 관리자 사용자를 반환합니다 (role == 1).
+#     최고 관리자 권한이 없는 경우 403 Forbidden을 발생시킵니다.
+#     """
+#     if not current_user.is_active:
+#         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Inactive user")
+#     if current_user.role != 1:  # role 1 (최고관리자)
+#         raise HTTPException(
+#             status_code=status.HTTP_403_FORBIDDEN,
+#             detail="Not enough permissions. Superuser role required."
+#         )
+#     return current_user

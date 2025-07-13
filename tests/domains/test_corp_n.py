@@ -1,16 +1,18 @@
 # tests/domains/test_corp_n.py
 
 import pytest
+import pytest_asyncio
 from httpx import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 from io import BytesIO
 
 from app.domains.corp import models as corp_models
+from app.domains.shared import models as shared_models
 
 #  API 경로를 정확하게 수정합니다.
 API_PREFIX = "/api/v1/corp"
 #  범용 파일 업로드 API 경로 (가정)
-FILES_API_PREFIX = "/api/v1/shared/files/upload"
+FILES_API_PREFIX = "/api/v1/shared/resources"
 
 
 @pytest.mark.asyncio
@@ -48,9 +50,20 @@ async def test_update_company_info(admin_client: AsyncClient, db_session: AsyncS
     assert db_info.name == "새로운 주식회사"
 
 
+@pytest_asyncio.fixture
+async def test_resource_category_for_logo(db_session: AsyncSession) -> shared_models.ResourceCategory:
+    """테스트용 리소스(logo) 카테고리를 생성하는 픽스처"""
+    category = shared_models.ResourceCategory(name="테스트 카테고리", description="테스트용입니다.")
+    db_session.add(category)
+    await db_session.commit()
+    await db_session.refresh(category)
+    return category
+
+
 @pytest.mark.asyncio
 async def test_update_company_logo_via_file_upload(
-    admin_client: AsyncClient, db_session: AsyncSession
+    admin_client: AsyncClient, db_session: AsyncSession,
+    test_resource_category_for_logo: shared_models.ResourceCategory
 ):
     """
     [개선된 로직] 파일을 업로드하고, 반환된 ID로 회사 로고를 갱신하는 과정을 테스트합니다.
@@ -60,13 +73,14 @@ async def test_update_company_logo_via_file_upload(
 
     #  2. Given: 테스트용 이미지 파일을 범용 파일 업로드 API에 전송합니다.
     file_content = b"fake image data"
-    files = {"upload_file": ("logo.png", BytesIO(file_content), "image/png")}
+    files = {"file": ("logo.png", BytesIO(file_content), "image/png")}
+    data = {"category_id": test_resource_category_for_logo.id, "description": "테스트 업로드"}
 
     #  [1단계: 파일 업로드]
-    upload_response = await admin_client.post(FILES_API_PREFIX, files=files)
-    assert upload_response.status_code == 201  # 파일 생성 성공
+    response = await admin_client.post(FILES_API_PREFIX, files=files, data=data)
+    assert response.status_code == 201  # 파일 생성 성공
 
-    uploaded_file_data = upload_response.json()
+    uploaded_file_data = response.json()
     logo_file_id = uploaded_file_data["id"]
 
     #  3. When: 위에서 받은 파일 ID를 사용하여 회사 정보를 갱신합니다.

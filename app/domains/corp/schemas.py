@@ -3,7 +3,7 @@
 from typing import Optional
 from sqlmodel import SQLModel, Field
 
-from app.domains.shared.schemas import FileRead  # FileRead 스키마 임포트
+from app.domains.shared import schemas as shared_schemas
 
 
 class CompanyInfoBase(SQLModel):
@@ -33,7 +33,7 @@ class CompanyInfoRead(CompanyInfoBase):
 
 
 class CompanyInfoReadWithLogo(CompanyInfoRead):
-    logo: Optional[FileRead] = None
+    logo: Optional[shared_schemas.ResourceRead] = None
 
 
 class CompanyInfoUpdate(SQLModel):

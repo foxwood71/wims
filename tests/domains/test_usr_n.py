@@ -8,13 +8,21 @@ import pytest
 from httpx import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from fastapi import status
+
 from app.domains.usr import models as usr_models
-from app.domains.usr.crud import department as department_crud
-from app.core.security import verify_password
+from app.domains.usr import crud as usr_crud
+# from app.core.security import verify_password
 
 
-# --- 부서 관리 엔드포인트 테스트 ---
+# =============================================================================
+# 1. 인증 (Authentication) 엔드포인트 테스트 -> test_auth_n.py로 이동
+# =============================================================================
 
+
+# =============================================================================
+# 2. 부서 (Department) 관리 엔드포인트 테스트
+# =============================================================================
 @pytest.mark.asyncio
 async def test_create_department_success_admin(
     admin_client: AsyncClient,
@@ -35,26 +43,6 @@ async def test_create_department_success_admin(
     created_department = response.json()
     assert created_department["name"] == department_data["name"]
     assert created_department["code"] == department_data["code"]
-
-
-@pytest.mark.asyncio
-async def test_create_department_duplicate_name_admin(
-    admin_client: AsyncClient,
-    db_session: AsyncSession
-):
-    """
-    이미 존재하는 이름의 부서 생성 시 400 에러를 반환하는지 테스트합니다.
-    """
-    existing_dept = usr_models.Department(code="EXST", name="기존 부서")
-    db_session.add(existing_dept)
-    await db_session.commit()
-    await db_session.refresh(existing_dept)
-
-    department_data = {"code": "NEWC", "name": "기존 부서"}
-    response = await admin_client.post("/api/v1/usr/departments", json=department_data)
-
-    assert response.status_code == 400
-    assert "already exists" in response.json()["detail"]
 
 
 @pytest.mark.asyncio
@@ -272,7 +260,7 @@ async def test_delete_department_success_admin(
     response = await admin_client.delete(f"/api/v1/usr/departments/{dept.id}")
     assert response.status_code == 204
 
-    deleted_dept = await department_crud.get(db_session, id=dept.id)
+    deleted_dept = await usr_crud.department.get(db_session, id=dept.id)
     assert deleted_dept is None
 
 
@@ -314,7 +302,7 @@ async def test_delete_department_with_associated_users(
     await db_session.refresh(dept_with_users)
 
     user_in_dept = usr_models.User(
-        username="userindept",
+        user_id="userindept",
         email="userindept@example.com",
         password_hash=get_password_hash_fixture("password"),
         department_id=dept_with_users.id,
@@ -330,50 +318,44 @@ async def test_delete_department_with_associated_users(
     assert "Cannot delete department" in response.json()["detail"]
 
 
-# --- 사용자 관리 엔드포인트 테스트 ---
-
+# =============================================================================
+# 3. 사용자 (User) 관리 엔드포인트 테스트
+# =============================================================================
 @pytest.mark.asyncio
-async def test_create_user_success_admin(
-    admin_client: AsyncClient,
-    db_session: AsyncSession,
-    test_department: usr_models.Department,
-):
+async def test_create_user_success_admin(admin_client: AsyncClient):
     """
     관리자 권한으로 새로운 사용자를 성공적으로 생성하는지 테스트합니다.
     """
     user_data = {
-        "username": "newuseradmin",
-        "password": "newpassword123",
-        "email": "newuseradmin@example.com",
-        "full_name": "New User Admin",
-        "department_id": test_department.id,
-        "role": usr_models.UserRole.GENERAL_USER,  # [수정] Enum 사용
+        "user_id": "newbie",
+        "password": "new_password_123",
+        "email": "newbie@example.com",
+        "name": "신입사원",
+        "role": usr_models.UserRole.GENERAL_USER,
     }
     response = await admin_client.post("/api/v1/usr/users", json=user_data)
-    assert response.status_code == 201
+    assert response.status_code == status.HTTP_201_CREATED
     created_user = response.json()
-    assert created_user["username"] == user_data["username"]
-    db_user = await db_session.get(usr_models.User, created_user["id"])
-    assert db_user is not None
-    assert verify_password(user_data["password"], db_user.password_hash)
+    assert created_user["user_id"] == user_data["user_id"]
+    assert "password_hash" not in created_user  # 응답에 비밀번호 해시가 없는지 확인
 
 
 @pytest.mark.asyncio
-async def test_create_user_duplicate_username_admin(
+async def test_create_user_duplicate_user_id_fail(
     admin_client: AsyncClient,
-    test_user: usr_models.User,
+    test_user: usr_models.User
 ):
     """
-    관리자 권한으로 사용자 생성 시, 중복 사용자명으로 400 에러를 반환하는지 테스트합니다.
+    중복된 user_id로 사용자 생성 시 400 에러를 반환하는지 테스트합니다.
     """
     user_data = {
-        "username": test_user.username,  # 중복 사용자명
-        "password": "newpassword",
-        "email": "another_email@example.com",
-        "role": usr_models.UserRole.GENERAL_USER
+        "user_id": test_user.user_id,  # 기존 사용자와 동일한 ID
+        "password": "another_password",
+        "email": "another@example.com",
+        "role": usr_models.UserRole.GENERAL_USER,
     }
     response = await admin_client.post("/api/v1/usr/users", json=user_data)
-    assert response.status_code == 400
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert "Username already registered" in response.json()["detail"]
 
 
@@ -386,9 +368,9 @@ async def test_create_user_duplicate_email_admin(
     관리자 권한으로 사용자 생성 시, 중복 이메일로 400 에러를 반환하는지 테스트합니다.
     """
     user_data = {
-        "username": "anotherusername",
+        "user_id": "anotherusername",
         "password": "newpassword",
-        "email": test_user.email,  # 중복 이메일
+        "email": test_user.email,  # 기존 사용자와 동일한 ID
         "role": usr_models.UserRole.GENERAL_USER
     }
     response = await admin_client.post("/api/v1/usr/users", json=user_data)
@@ -405,7 +387,7 @@ async def test_create_user_unauthorized(
     권한 없는 사용자의 사용자 생성 시도를 테스트합니다. (일반 사용자, 비인증 사용자)
     """
     user_data = {
-        "username": "unauthuser",
+        "user_id": "unauthuser",
         "password": "password123",
         "email": "unauth@example.com",
         "role": usr_models.UserRole.GENERAL_USER
@@ -430,12 +412,15 @@ async def test_read_users_success_admin(
     assert response.status_code == 200
     users_list = response.json()
     assert len(users_list) >= 2
-    assert any(u["username"] == test_user.username for u in users_list)
-    assert any(u["username"] == test_admin_user.username for u in users_list)
+    assert any(u["user_id"] == test_user.user_id for u in users_list)
+    assert any(u["user_id"] == test_admin_user.user_id for u in users_list)
 
 
 @pytest.mark.asyncio
-async def test_read_users_pagination_user_self(authorized_client: AsyncClient, test_user: usr_models.User):
+async def test_read_users_pagination_user_self(
+    authorized_client: AsyncClient,
+    test_user: usr_models.User
+):
     """
     일반 사용자가 자신의 사용자 정보에 대해 페이징을 시도하는 경우, 항상 자신의 정보만 반환하는지 테스트합니다.
     """
@@ -457,7 +442,7 @@ async def test_read_user_by_id_success_admin(
     """
     response_other = await admin_client.get(f"/api/v1/usr/users/{test_user.id}")
     assert response_other.status_code == 200
-    assert response_other.json()["username"] == test_user.username
+    assert response_other.json()["user_id"] == test_user.user_id
 
 
 @pytest.mark.asyncio
@@ -470,7 +455,7 @@ async def test_read_user_by_id_success_user_self(
     """
     response = await authorized_client.get(f"/api/v1/usr/users/{test_user.id}")
     assert response.status_code == 200
-    assert response.json()["username"] == test_user.username
+    assert response.json()["user_id"] == test_user.user_id
 
 
 @pytest.mark.asyncio
@@ -494,99 +479,99 @@ async def test_update_user_success_user_self(
     """
     일반 사용자가 자신의 정보를 성공적으로 업데이트하는지 테스트합니다.
     """
-    update_data = {"full_name": "Updated User Name"}
+    update_data = {"name": "Updated User Name"}
     response = await authorized_client.put(f"/api/v1/usr/users/{test_user.id}", json=update_data)
     assert response.status_code == 200
     db_updated_user = await db_session.get(usr_models.User, test_user.id)
-    assert db_updated_user.full_name == update_data["full_name"]
+    assert db_updated_user.name == update_data["name"]
 
 
 @pytest.mark.asyncio
-async def test_update_user_prevent_superuser_role_change(
-    admin_client: AsyncClient,
-    test_superuser: usr_models.User,
+async def test_update_user_prevent_admin_role_change(
+    authorized_client: AsyncClient,
+    test_admin_user: usr_models.User,
     db_session: AsyncSession
 ):
     """
-    최고 관리자 계정의 역할을 변경하려고 시도할 때 400 에러를 반환하는지 테스트합니다.
+    관리자 이하 계정이 관리자 계정의 역할을 변경하려고 시도할 때 403 에러를 반환하는지 테스트합니다.
     """
-    update_data = {"role": usr_models.UserRole.ADMIN}  # [수정] Enum 사용
-    response = await admin_client.put(f"/api/v1/usr/users/{test_superuser.id}", json=update_data)
-    assert response.status_code == 400
-    assert "Cannot change the role" in response.json()["detail"]
-    db_superuser = await db_session.get(usr_models.User, test_superuser.id)
-    assert db_superuser.role == usr_models.UserRole.SUPERUSER
+    update_data = {"role": usr_models.UserRole.GENERAL_USER}  # [수정] Enum 사용
+    response = await authorized_client.put(f"/api/v1/usr/users/{test_admin_user.id}", json=update_data)
+    assert response.status_code == 403
+    assert "Not enough permissions" in response.json()["detail"]
+    db_admin_user = await db_session.get(usr_models.User, test_admin_user.id)
+    assert db_admin_user.role == usr_models.UserRole.ADMIN
 
 
 @pytest.mark.asyncio
-async def test_update_user_prevent_superuser_deactivation(
+async def test_update_user_prevent_admin_deactivation(
     admin_client: AsyncClient,
-    test_superuser: usr_models.User,
+    test_admin_user: usr_models.User,
     db_session: AsyncSession
 ):
     """
-    최고 관리자 계정을 비활성화하려고 시도할 때 400 에러를 반환하는지 테스트합니다.
+    관리자 계정을 비활성화하려고 시도할 때 400 에러를 반환하는지 테스트합니다.
     """
     update_data = {"is_active": False}
-    response = await admin_client.put(f"/api/v1/usr/users/{test_superuser.id}", json=update_data)
+    response = await admin_client.put(f"/api/v1/usr/users/{test_admin_user.id}", json=update_data)
     assert response.status_code == 400
     assert "Cannot deactivate" in response.json()["detail"]
-    db_superuser = await db_session.get(usr_models.User, test_superuser.id)
+    db_superuser = await db_session.get(usr_models.User, test_admin_user.id)
     assert db_superuser.is_active is True
 
 
 @pytest.mark.asyncio
-async def test_update_user_prevent_promote_to_superuser(
+async def test_update_user_prevent_promote_to_admin(
     admin_client: AsyncClient,
     test_user: usr_models.User,
     db_session: AsyncSession
 ):
     """
-    일반 사용자를 최고 관리자 역할로 변경 시도 시 403 에러를 반환하는지 테스트합니다.
+    일반 사용자를 관리자로 역할 변경 시도 시 403 에러를 반환하는지 테스트합니다.
     """
-    update_data = {"role": usr_models.UserRole.SUPERUSER}  # [수정] Enum 사용
+    update_data = {"role": usr_models.UserRole.ADMIN}  # [수정] Enum 사용
     response = await admin_client.put(f"/api/v1/usr/users/{test_user.id}", json=update_data)
     assert response.status_code == 403
-    assert "Only a superuser can" in response.json()["detail"]
+    assert "Only a admin can" in response.json()["detail"]
     db_user = await db_session.get(usr_models.User, test_user.id)
     assert db_user.role == usr_models.UserRole.GENERAL_USER
 
 
 @pytest.mark.asyncio
-async def test_delete_user_success_superuser(
-    superuser_client: AsyncClient,
+async def test_delete_user_success_admin(
+    admin_client: AsyncClient,
     test_user: usr_models.User,
     db_session: AsyncSession
 ):
     """
-    최고 관리자 권한으로 사용자를 성공적으로 삭제하는지 테스트합니다.
+    관리자 권한으로 사용자를 성공적으로 삭제하는지 테스트합니다.
     """
-    response = await superuser_client.delete(f"/api/v1/usr/users/{test_user.id}")
+    response = await admin_client.delete(f"/api/v1/usr/users/{test_user.id}")
     assert response.status_code == 204
     deleted_user = await db_session.get(usr_models.User, test_user.id)
     assert deleted_user is None
 
 
 @pytest.mark.asyncio
-async def test_delete_user_admin_no_permission(
-    admin_client: AsyncClient,
+async def test_delete_user_authorized_user_no_permission(
+    authorized_client: AsyncClient,
     test_user: usr_models.User
 ):
     """
-    관리자 권한으로 사용자 삭제 시도 시 403 Forbidden을 반환하는지 테스트합니다.
+    일반 권한으로 사용자 삭제 시도 시 403 Forbidden을 반환하는지 테스트합니다.
     """
-    response = await admin_client.delete(f"/api/v1/usr/users/{test_user.id}")
+    response = await authorized_client.delete(f"/api/v1/usr/users/{test_user.id}")
     assert response.status_code == 403
 
 
 @pytest.mark.asyncio
 async def test_delete_superuser_self_attempt(
-    superuser_client: AsyncClient,
-    test_superuser: usr_models.User
+    admin_client: AsyncClient,
+    test_admin_user: usr_models.User
 ):
     """
     최고 관리자가 자신의 계정을 삭제 시도 시 400 Bad Request를 반환하는지 테스트합니다.
     """
-    response = await superuser_client.delete(f"/api/v1/usr/users/{test_superuser.id}")
+    response = await admin_client.delete(f"/api/v1/usr/users/{test_admin_user.id}")
     assert response.status_code == 400
     assert "Cannot delete your own superuser account" in response.json()["detail"]

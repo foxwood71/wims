@@ -139,14 +139,77 @@ equipment_spec_definitions에 정의된 속성이 변경(추가, 또는 삭제, 
 
 # 테스트 오류
 
-ERROR tests/domains/test_lims_n.py::TestWorksheetAndItems::test_create_worksheet_item_success
-ERROR tests/domains/test_lims_n.py::TestWorksheetAndItems::test_soft_delete_worksheet_item
-FAILED tests/domains/test_lims_n.py::test_soft_delete_parameter_success_admin
-FAILED tests/domains/test_lims_n.py::test_create_test_request_with_auto_user_id
-FAILED tests/domains/test_lims_n.py::test_create_sample_success
-FAILED tests/domains/test_lims_n.py::test_create_aliquot_sample_success
-FAILED tests/domains/test_lims_n.py::test_read_aliquot_samples_with_filter
-FAILED tests/domains/test_lims_n.py::test_update_aliquot_sample_status_triggers_parent_update
-FAILED tests/domains/test_lims_n.py::test_create_analysis_result_success_user
-FAILED tests/domains/test_lims_n.py::test_crud_sample_container
-FAILED tests/domains/test_lims_n.py::test_crud_weather_condition
+FAILED tests/domains/test_shared_n.py::test_upload_image_success - assert 500 == 201
+FAILED tests/domains/test_shared_n.py::test_image_permissions_as_admin - sqlalchemy.exc.IntegrityError: (sqlalchemy.dialects.postgresql.asyncpg.IntegrityError) <class 'asyncpg.exceptions.NotNullViolationError'>: "user_id" 칼럼(해당 릴레이션 "users")의 null 값이 not null 제약조건을 위반했습니다.
+FAILED tests/domains/test_shared_n.py::test_image_permissions_as_owner - assert 403 == 200
+FAILED tests/domains/test_shared_n.py::test_read_entity_images_for_entity_with_image_details - pydantic_core.\_pydantic_core.ValidationError: 1 validation error for ImageCreate
+
+# ======================================================================================================
+
+## 해결 방안: 토큰을 직접 교체하여 사용자 전환하기
+
+이 문제를 해결하기 위한 가장 좋은 방법은, 하나의 클라이언트만 사용하되 테스트 도중에 인증 토큰을 직접 교체하여 사용자를 전환하는 것입니다.
+
+이렇게 하면 dependency_overrides를 건드리지 않고도 여러 사용자의 행동을 하나의 테스트 안에서 시뮬레이션할 수 있습니다.
+
+아래는 관리자가 파일을 만들고 일반 사용자가 삭제를 시도하는 테스트의 올바른 예시입니다.
+
+Python
+
+# tests/test_your_feature.py (수정된 테스트 예시)
+
+import pytest
+from httpx import AsyncClient
+from sqlmodel.ext.asyncio.session import AsyncSession # 타입 힌팅을 위해 추가
+
+# conftest.py에 정의된 사용자 모델을 임포트합니다.
+
+from app.domains.usr.models import User as UsrUser
+
+# pytest.mark.asyncio # 클래스에 적용되지 않았다면 함수에 개별적으로 추가
+
+async def test_user_cannot_delete_resource_created_by_admin(
+admin_client: AsyncClient, # 관리자 클라이언트를 주체로 사용
+test_user: UsrUser, # 일반 사용자 데이터는 test_user 픽스처에서 가져옴
+db_session: AsyncSession # 필요한 경우 DB 세션도 가져옴
+):
+"""
+관리자가 생성한 리소스를 일반 사용자가 삭제할 수 없는지 확인하는 테스트
+""" # 1. 관리자(admin_client)가 리소스를 생성합니다. # (예시: /api/v1/files 엔드포인트에 POST 요청)
+create_payload = {"name": "admin_file.txt", "content": "secret"}
+response_create = await admin_client.post("/api/v1/files", json=create_payload)
+assert response_create.status_code == 201 # 201 Created 라고 가정
+resource_id = response_create.json()["id"]
+
+    # 2. 일반 사용자(test_user)로 로그인하여 새로운 토큰을 발급받습니다.
+    #    이때 admin_client를 재활용하여 로그인 API를 호출합니다.
+    login_data = {"username": test_user.username, "password": "testpassword123"}
+    response_login = await admin_client.post("/api/v1/usr/auth/token", data=login_data)
+    assert response_login.status_code == 200
+    user_token = response_login.json()["access_token"]
+
+    # 3. 클라이언트의 인증 헤더를 일반 사용자의 토큰으로 교체합니다.
+    admin_client.headers["Authorization"] = f"Bearer {user_token}"
+
+    # 4. 이제 클라이언트는 일반 사용자 역할을 합니다.
+    #    관리자가 생성한 리소스를 삭제하려고 시도합니다.
+    response_delete = await admin_client.delete(f"/api/v1/files/{resource_id}")
+
+    # 5. "Forbidden" 또는 "Not Found" 등 권한 없음을 나타내는 상태 코드를 기대합니다.
+    #    (API 구현에 따라 403 또는 404를 반환할 수 있습니다.)
+    assert response_delete.status_code == 403  # 또는 404
+
+    # (선택) DB를 직접 확인하여 실제로 삭제되지 않았는지 검증할 수도 있습니다.
+    # from app.domains.your_domain.models import YourFileModel
+    # db_obj = await db_session.get(YourFileModel, resource_id)
+    # assert db_obj is not None
+
+## 핵심 요약
+
+하나의 테스트 함수 안에서는 하나의 인증 클라이언트 픽스처(admin_client 등)만 사용하세요.
+
+다른 사용자의 역할을 시뮬레이션해야 할 경우, 해당 사용자의 정보(test_user 픽스처 등)를 가져와 로그인 API를 직접 호출하여 새 토큰을 얻으세요.
+
+클라이언트 인스턴스의 headers["Authorization"] 값을 새 토큰으로 교체하여 사용자를 전환하세요.
+
+이 방식을 사용하면 dependency_overrides 상태를 건드리지 않으므로, FastAPI 애플리케이션의 실제 동작 방식과 거의 동일하게 권한 로직을 정확하게 테스트할 수 있습니다.

@@ -38,7 +38,7 @@ from app.domains.rpt.routers import router as rpt_router
 # ARQ 워커가 실행할 태스크 함수 목록
 worker_functions = [
     core_tasks.health_check_database_task,
-    shared_tasks.cleanup_unused_images_task,
+    shared_tasks.cleanup_unused_resources_task,
     inv_tasks.add_spec_key_for_all_materials,
     inv_tasks.update_spec_key_for_all_materials,
     inv_tasks.delete_spec_key_for_all_materials,

@@ -10,8 +10,13 @@
 """
 
 import pytest
+import pytest_asyncio
+from datetime import date, datetime, timedelta, UTC
 from httpx import AsyncClient
+
 from sqlmodel.ext.asyncio.session import AsyncSession
+
+from app.core.security import get_password_hash
 
 # 다른 도메인의 모델 임포트
 from app.domains.loc import models as loc_models
@@ -23,7 +28,6 @@ from app.domains.lims import crud as lims_crud
 from app.domains.lims import models as lims_models
 from app.domains.lims import schemas as lims_schemas
 
-from datetime import date, datetime, timedelta, UTC
 
 # -----------------------------------------------------------------------------
 # 참고:
@@ -31,6 +35,417 @@ from datetime import date, datetime, timedelta, UTC
 # test_lims_project, test_instrument 등)는 conftest.py 파일에 중앙 관리되고 있으며,
 # pytest가 자동으로 주입합니다. 이 테스트 파일 내에서는 픽스처를 재정의하지 않습니다.
 # -----------------------------------------------------------------------------
+@pytest_asyncio.fixture(name="test_parameter")
+async def test_parameter_fixture(db_session: AsyncSession, test_instrument: fms_models.Equipment) -> lims_models.Parameter:
+    """테스트에서 사용할 기본 분석 항목(Parameter)을 생성하고 반환합니다."""
+    parameter = lims_models.Parameter(
+        code="pH",  # 고유한 코드로 설정
+        name="수소이온농도",
+        sort_order=50,
+        instrument_id=test_instrument.id,
+        units="-"
+    )
+    db_session.add(parameter)
+    await db_session.commit()
+    await db_session.refresh(parameter)
+    return parameter
+
+
+@pytest_asyncio.fixture(name="test_lims_project")
+async def test_lims_project_fixture(db_session: AsyncSession) -> lims_models.Project:
+    """테스트용 LIMS 프로젝트를 생성하고 반환합니다."""
+    project = lims_models.Project(
+        code="LIMS",
+        name="기본 LIMS 프로젝트",
+        start_date=date(2024, 1, 1),
+        end_date=date(2025, 12, 31)
+    )
+    db_session.add(project)
+    await db_session.commit()
+    await db_session.refresh(project)
+    return project
+
+
+@pytest_asyncio.fixture(name="test_test_request")
+async def test_test_request_fixture(
+    db_session: AsyncSession,
+    test_lims_project: lims_models.Project,
+    test_department: usr_models.Department,
+    test_user: usr_models.User,
+) -> lims_models.TestRequest:
+    """테스트용 시험 의뢰(TestRequest)를 생성하고 반환합니다."""
+    test_req = lims_models.TestRequest(
+        request_date=date.today(),
+        project_id=test_lims_project.id,
+        department_id=test_department.id,
+        requester_user_id=test_user.id,
+        title="일반 테스트 의뢰",
+        requested_parameters={"pH": True, "BOD": True},
+    )
+    db_session.add(test_req)
+    await db_session.commit()
+    await db_session.refresh(test_req)
+    return test_req
+
+
+@pytest_asyncio.fixture(name="test_sampling_point")
+async def test_sampling_point_fixture(db_session: AsyncSession, test_facility: loc_models.facility) -> lims_models.SamplingPoint:
+    """테스트용 채수 지점(SamplingPoint)을 생성하고 반환합니다."""
+    point = lims_models.SamplingPoint(
+        code="FINAL-EFF", name="최종방류구", facility_id=test_facility.id
+    )
+    db_session.add(point)
+    await db_session.commit()
+    await db_session.refresh(point)
+    return point
+
+
+@pytest_asyncio.fixture(name="test_sample_type")
+async def test_sample_type_fixture(db_session: AsyncSession) -> lims_models.SampleType:
+    """테스트용 시료 유형(SampleType)을 생성하고 반환합니다."""
+    sample_type = lims_models.SampleType(code=1, name="일반 시료")
+    # 중복을 피하기 위해 이미 존재하는지 확인
+    existing = await db_session.get(lims_models.SampleType, 1)
+    if existing:
+        return existing
+    db_session.add(sample_type)
+    await db_session.commit()
+    await db_session.refresh(sample_type)
+    return sample_type
+
+
+@pytest_asyncio.fixture(name="test_sample_container")
+async def test_sample_container_fixture(db_session: AsyncSession) -> lims_models.SampleContainer:
+    """테스트용 시료 용기(SampleContainer)를 생성하고 반환합니다."""
+    container = lims_models.SampleContainer(code=1, name="1L 채수병")
+    # 중복을 피하기 위해 이미 존재하는지 확인
+    existing = await db_session.get(lims_models.SampleContainer, 1)
+    if existing:
+        return existing
+    db_session.add(container)
+    await db_session.commit()
+    await db_session.refresh(container)
+    return container
+
+
+@pytest_asyncio.fixture(name="test_weather_condition")
+async def test_weather_condition_fixture(db_session: AsyncSession) -> lims_models.WeatherCondition:
+    """테스트용 날씨 정보(WeatherCondition)를 생성하고 반환합니다."""
+    weather = lims_models.WeatherCondition(code=1, status="맑음")
+    # 중복을 피하기 위해 이미 존재하는지 확인
+    existing = await db_session.get(lims_models.WeatherCondition, 1)
+    if existing:
+        return existing
+    db_session.add(weather)
+    await db_session.commit()
+    await db_session.refresh(weather)
+    return weather
+
+
+@pytest_asyncio.fixture(name="test_sample")
+async def test_sample_fixture(
+    db_session: AsyncSession,
+    test_test_request: lims_models.TestRequest,
+    test_sampling_point: lims_models.SamplingPoint,
+    test_sample_type: lims_models.SampleType,
+    test_sample_container: lims_models.SampleContainer,
+    test_user: usr_models.User,
+) -> lims_models.Sample:
+    """테스트용 원시료(Sample)를 생성하고 반환합니다."""
+    sample = lims_models.Sample(
+        request_id=test_test_request.id,
+        sampling_point_id=test_sampling_point.id,
+        sampling_date=date.today(),
+        sample_type_id=test_sample_type.id,
+        container_id=test_sample_container.id,
+        parameters_for_analysis={"TN": True, "TP": True},
+        collector_user_id=test_user.id,
+    )
+    db_session.add(sample)
+    await db_session.commit()
+    await db_session.refresh(sample)
+    return sample
+
+
+@pytest_asyncio.fixture(name="test_instrument")
+async def test_instrument_fixture(
+    db_session: AsyncSession, test_facility: loc_models.facility, test_equipment_category: fms_models.EquipmentCategory
+) -> fms_models.Equipment:
+    instrument = fms_models.Equipment(
+        facility_id=test_facility.id,  # <<< 수정된 부분
+        equipment_category_id=test_equipment_category.id,
+        name="테스트 분석기기",
+        model_number="MODEL-X",
+        serial_number="SN-INSTR-001",
+    )
+    db_session.add(instrument)
+    await db_session.commit()
+    await db_session.refresh(instrument)
+    return instrument
+
+
+@pytest_asyncio.fixture(name="test_aliquot_sample")
+async def test_aliquot_sample_fixture(
+    db_session: AsyncSession,
+    test_lims_project: lims_models.Project,
+    test_department: usr_models.Department,
+    test_sampler_user: usr_models.User,
+    test_sampling_point: lims_models.SamplingPoint,
+    test_sample_container: lims_models.SampleContainer,
+    test_sample_type: lims_models.SampleType,
+    test_instrument: fms_models.Equipment,
+    test_weather_condition: lims_models.WeatherCondition,  # 추가: TestRequest 생성 시 필요할 수 있음
+) -> lims_models.AliquotSample:
+    # TestRequest 생성
+    test_req = lims_models.TestRequest(
+        request_date=date.today(),
+        project_id=test_lims_project.id,
+        department_id=test_department.id,
+        requester_user_id=test_sampler_user.id,
+        title="Test request for aliquot",
+        requested_parameters={},
+        sampling_weather_id=test_weather_condition.id,  # 추가: sampling_weather_id 설정
+    )
+    db_session.add(test_req)
+    await db_session.commit()
+    await db_session.refresh(test_req)
+
+    # Sample 생성
+    test_sample = lims_models.Sample(
+        request_id=test_req.id,
+        sampling_point_id=test_sampling_point.id,
+        sampling_date=date.today(),
+        sample_type_id=test_sample_type.id,
+        container_id=test_sample_container.id,
+        parameters_for_analysis={},
+        collector_user_id=test_sampler_user.id,  # 추가: collector_user_id 설정
+    )
+    db_session.add(test_sample)
+    await db_session.commit()
+    await db_session.refresh(test_sample)
+
+    # Parameter 생성
+    test_param = lims_models.Parameter(
+        code="TPAR", name="테스트 파라미터", sort_order=1, instrument_id=test_instrument.id
+    )
+    db_session.add(test_param)
+    await db_session.commit()
+    await db_session.refresh(test_param)
+
+    # AliquotSample 생성
+    aliquot = lims_models.AliquotSample(
+        parent_sample_id=test_sample.id,
+        parameter_id=test_param.id,
+        analysis_status="Pending",
+        analyst_user_id=test_sampler_user.id,  # 추가: analyst_user_id 설정
+    )
+    db_session.add(aliquot)
+    await db_session.commit()
+    await db_session.refresh(aliquot)
+    return aliquot
+
+
+@pytest_asyncio.fixture(name="test_worksheet")
+async def test_worksheet_fixture(db_session: AsyncSession) -> lims_models.Worksheet:
+    ws = lims_models.Worksheet(code="WS01", name="일일 수질 분석 워크시트", sort_order=1)
+    db_session.add(ws)
+    await db_session.commit()
+    await db_session.refresh(ws)
+    return ws
+
+
+# 추가 픽스처들 (필요에 따라 더 구체적인 데이터로 채울 수 있음)
+@pytest_asyncio.fixture(name="test_worksheet_item")
+async def test_worksheet_item_fixture(db_session: AsyncSession, test_worksheet: lims_models.Worksheet) -> lims_models.WorksheetItem:
+    item = lims_models.WorksheetItem(
+        worksheet_id=test_worksheet.id,
+        code="ITEM01",
+        priority_order=1,
+        xls_cell_address="A1",
+        name="항목 1",
+        label="라벨 1",
+        type=1,  # 숫자
+        unit="mg/L",
+    )
+    db_session.add(item)
+    await db_session.commit()
+    await db_session.refresh(item)
+    return item
+
+
+@pytest_asyncio.fixture(name="test_worksheet_data")
+async def test_worksheet_data_fixture(
+    db_session: AsyncSession, test_worksheet: lims_models.Worksheet, test_analyst_user: usr_models.User
+) -> lims_models.WorksheetData:
+    data = lims_models.WorksheetData(
+        worksheet_id=test_worksheet.id,
+        data_date=date.today(),
+        analyst_user_id=test_analyst_user.id,
+        raw_data={"key1": "value1", "key2": 123},
+        is_verified=False,
+    )
+    db_session.add(data)
+    await db_session.commit()
+    await db_session.refresh(data)
+    return data
+
+
+@pytest_asyncio.fixture(name="test_analysis_result")
+async def test_analysis_result_fixture(
+    db_session: AsyncSession,
+    test_aliquot_sample: lims_models.AliquotSample,
+    test_worksheet: lims_models.Worksheet,
+    test_worksheet_data: lims_models.WorksheetData,
+    test_analyst_user: usr_models.User,
+) -> lims_models.AnalysisResult:
+    result = lims_models.AnalysisResult(
+        aliquot_sample_id=test_aliquot_sample.id,
+        parameter_id=test_aliquot_sample.parameter_id,  # test_aliquot_sample.parameter로 접근하는 대신 ID 사용
+        worksheet_id=test_worksheet.id,
+        worksheet_data_id=test_worksheet_data.id,
+        result_value=7.2,
+        unit="pH",
+        analysis_date=date.today(),
+        analyst_user_id=test_analyst_user.id,
+        is_approved=False,
+    )
+    db_session.add(result)
+    await db_session.commit()
+    await db_session.refresh(result)
+    return result
+
+
+@pytest_asyncio.fixture(name="test_test_request_template")
+async def test_test_request_template_fixture(db_session: AsyncSession, test_user: usr_models.User) -> lims_models.TestRequestTemplate:
+    template = lims_models.TestRequestTemplate(
+        name="General Template",
+        user_id=test_user.id,
+        serialized_text={"project": "Default", "parameters": ["pH", "DO"]},
+    )
+    db_session.add(template)
+    await db_session.commit()
+    await db_session.refresh(template)
+    return template
+
+
+@pytest_asyncio.fixture(name="test_pr_view")
+async def test_pr_view_fixture(
+    db_session: AsyncSession, test_user: usr_models.User, test_facility: loc_models.facility
+) -> lims_models.PrView:
+    pr_view = lims_models.PrView(
+        name="My Custom View",
+        user_id=test_user.id,
+        plant_id=test_facility.id,
+        sampling_point_ids=[],  # 더미 ID 대신 빈 리스트 또는 실제 유효한 ID
+        parameter_ids=[],  # 더미 ID 대신 빈 리스트 또는 실제 유효한 ID
+        memo="Custom view for daily checks",
+    )
+    db_session.add(pr_view)
+    await db_session.commit()
+    await db_session.refresh(pr_view)
+    return pr_view
+
+
+@pytest_asyncio.fixture(name="test_standard_sample")
+async def test_standard_sample_fixture(db_session: AsyncSession, test_instrument: fms_models.Equipment) -> lims_models.StandardSample:
+    param_for_std = lims_models.Parameter(
+        code="STD_PARAM", name="Standard Test Param", sort_order=1, instrument_id=test_instrument.id
+    )
+    db_session.add(param_for_std)
+    await db_session.commit()
+    await db_session.refresh(param_for_std)
+
+    std_sample = lims_models.StandardSample(
+        code="REF001",
+        name="Reference Sample 1",
+        parameter_id=param_for_std.id,
+        concentration=10.5,
+        preparation_date=date.today(),
+        expiration_date=date.today() + timedelta(days=365),
+    )
+    db_session.add(std_sample)
+    await db_session.commit()
+    await db_session.refresh(std_sample)
+    return std_sample
+
+
+@pytest_asyncio.fixture(name="test_calibration_record")
+async def test_calibration_record_fixture(
+    db_session: AsyncSession,
+    test_instrument: fms_models.Equipment,
+    test_user: usr_models.User,  # test_analyst_user 대신 test_user 사용
+    test_standard_sample: lims_models.StandardSample,
+) -> lims_models.CalibrationRecord:
+    # test_standard_sample이 이미 parameter를 포함하므로 재사용
+    param_id = test_standard_sample.parameter_id  # parameter 대신 parameter_id 사용
+
+    cal_record = lims_models.CalibrationRecord(
+        equipment_id=test_instrument.id,
+        parameter_id=param_id,
+        calibration_date=datetime.now(UTC),
+        next_calibration_date=date.today() + timedelta(days=90),
+        calibrated_by_user_id=test_user.id,
+        standard_sample_id=test_standard_sample.id,
+        acceptance_criteria_met=True,
+    )
+    db_session.add(cal_record)
+    await db_session.commit()
+    await db_session.refresh(cal_record)
+    return cal_record
+
+
+@pytest_asyncio.fixture(name="test_qc_sample_result")
+async def test_qc_sample_result_fixture(
+    db_session: AsyncSession,
+    test_aliquot_sample: lims_models.AliquotSample,  # AliquotSample은 이미 Parameter를 포함
+    test_user: usr_models.User,  # test_analyst_user 대신 test_user 사용
+) -> lims_models.QcSampleResult:
+    qc_result = lims_models.QcSampleResult(
+        aliquot_sample_id=test_aliquot_sample.id,
+        parameter_id=test_aliquot_sample.parameter_id,  # AliquotSample이 가진 파라미터 ID 사용
+        qc_type="Blank",
+        expected_value=0.0,
+        measured_value=0.005,
+        recovery=None,
+        rpd=None,
+        acceptance_criteria={},
+        passed_qc=True,
+        analysis_date=date.today(),
+        analyst_user_id=test_user.id,
+    )
+    db_session.add(qc_result)
+    await db_session.commit()
+    await db_session.refresh(qc_result)
+    return qc_result
+
+
+# --- LIMS 관련 픽스처 추가 (test_lims.py에서 옮겨옴) ---
+@pytest_asyncio.fixture(name="test_sampler_user")
+async def test_sampler_user_fixture(db_session: AsyncSession) -> usr_models.User:
+    user = usr_models.User(
+        username="sampler",
+        password_hash=get_password_hash("samplerpass"),
+        email="sampler@example.com",
+        role=100,
+    )
+    db_session.add(user)
+    await db_session.commit()
+    await db_session.refresh(user)
+    return user
+
+
+@pytest_asyncio.fixture(name="test_analyst_user")
+async def test_analyst_user_fixture(db_session: AsyncSession) -> usr_models.User:
+    user = usr_models.User(
+        username="analyst",
+        password_hash=get_password_hash("analystpass"),
+        email="analyst@example.com",
+        role=100,
+    )
+    db_session.add(user)
+    await db_session.commit()
+    await db_session.refresh(user)
+    return user
 
 
 # =============================================================================

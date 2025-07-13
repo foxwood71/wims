@@ -21,7 +21,7 @@ from enum import IntEnum  # [추가] IntEnum을 임포트합니다.
 # 다른 도메인의 모델을 참조해야 할 경우
 # TYPE_CHECKING을 사용하여 순환 임포트 문제를 방지합니다.
 if TYPE_CHECKING:
-    from app.domains.shared.models import Image, File
+    from app.domains.shared.models import Resource
     from app.domains.lims.models import TestRequest, Sample, AliquotSample, WorksheetData, AnalysisResult, TestRequestTemplate, PrView, CalibrationRecord, QcSampleResult
     from app.domains.fms.models import EquipmentHistory
     from app.domains.inv.models import MaterialTransaction
@@ -36,12 +36,11 @@ class UserRole(IntEnum):
     사용자 역할을 정의하는 정수형 Enum 클래스입니다.
     DB에는 정수 값으로 저장되지만, 코드에서는 명시적인 역할 이름으로 사용할 수 있습니다.
     """
-    SUPERUSER = 1           # 최고 관리자
-    ADMIN = 10              # 시스템 관리자
-    FACILITY_MANAGER = 50   # 설비 관리자
-    INVENTORY_MANAGER = 60  # 자재 관리자
-    LAB_MANAGER = 70        # 실험실 관리자
-    LAB_ANALYST = 80        # 실험 분석가
+    ADMIN = 1               # 시스템 관리자
+    LAB_MANAGER = 10        # 실험실 관리자
+    LAB_ANALYST = 11        # 실험 분석가
+    FACILITY_MANAGER = 20   # 설비 관리자
+    INVENTORY_MANAGER = 30  # 자재 관리자
     GENERAL_USER = 100      # 일반 사용자
 
 
@@ -78,7 +77,13 @@ class Department(DepartmentBase, table=True):
     __tablename__ = "departments"
     __table_args__ = {'schema': 'usr'}
 
+    # usr 도메인 내부 관계 정의:
     users: List["User"] = Relationship(back_populates="department")
+
+    # shared 도메인 관련 관계들
+    uploaded_resources: Optional["Resource"] = Relationship(back_populates="department")
+
+    # lims 도메인 관련 관계들
     test_requests: List["TestRequest"] = Relationship(back_populates="department")
 
 
@@ -90,10 +95,11 @@ class UserBase(SQLModel):
     usr.users 테이블의 기본 속성을 정의하는 SQLModel Base 클래스입니다.
     """
     id: Optional[int] = Field(default=None, primary_key=True, description="사용자 고유 ID")
-    username: str = Field(max_length=50, sa_column_kwargs={"unique": True}, description="로그인 사용자명")
+    user_id: str = Field(max_length=50, sa_column_kwargs={"unique": True}, description="로그인 사용자명")
     password_hash: str = Field(max_length=255, description="해싱된 비밀번호")
     email: Optional[str] = Field(default=None, max_length=100, sa_column_kwargs={"unique": True}, description="사용자 이메일")
-    full_name: Optional[str] = Field(default=None, max_length=100, description="사용자 전체 이름")
+    name: Optional[str] = Field(default=None, max_length=100, description="사용자 전체 이름")
+    notes: Optional[str] = Field(default=None, description="비고")
     department_id: Optional[int] = Field(
         default=None,
         sa_column=Column(
@@ -125,26 +131,19 @@ class User(UserBase, table=True):
     __tablename__ = "users"
     __table_args__ = {'schema': 'usr'}
 
-    # 관계 정의:
-    department: Optional["Department"] = Relationship(
-        back_populates="users",
-        sa_relationship_kwargs={"foreign_keys": "User.department_id"}
-    )
+    # usr 내부 관계 정의:
+    department: Optional["Department"] = Relationship(back_populates="users")
 
-    uploaded_images: List["Image"] = Relationship(
-        back_populates="uploaded_by_user",
-        sa_relationship_kwargs={"foreign_keys": "[Image.uploaded_by_user_id]"}
-    )
+    # shared 도메인 관련 관계들
+    uploaded_resources: List["Resource"] = Relationship(back_populates="uploader")
 
-    uploaded_files: List["File"] = Relationship(
-        back_populates="uploaded_by_user",
-        sa_relationship_kwargs={"foreign_keys": "[File.uploaded_by_user_id]"}
-    )
-
+    # fms 도메인 관련 관계들
     equipment_history_records: List["EquipmentHistory"] = Relationship(back_populates="performed_by_user")
+
+    # inv 도메인 관련 관계들
     material_transactions: List["MaterialTransaction"] = Relationship(back_populates="performed_by_user")
 
-    # LIMS 도메인 관련 관계들
+    # lims 도메인 관련 관계들
     test_requests_created: List["TestRequest"] = Relationship(back_populates="requester_user", sa_relationship_kwargs={'foreign_keys': '[TestRequest.requester_user_id]'})
     samples_collected: List["Sample"] = Relationship(back_populates="collector_user", sa_relationship_kwargs={'foreign_keys': '[Sample.collector_user_id]'})
     aliquot_samples_analyzed: List["AliquotSample"] = Relationship(back_populates="analyst", sa_relationship_kwargs={'foreign_keys': '[AliquotSample.analyst_user_id]'})

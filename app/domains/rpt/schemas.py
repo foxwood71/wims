@@ -4,7 +4,7 @@ from typing import Optional
 from pydantic import BaseModel, Field
 
 # shared 스키마를 참조하여 응답에 파일 정보를 포함시킬 수 있습니다.
-from app.domains.shared.schemas import FileRead
+from app.domains.shared import schemas as shared_schemas
 
 
 class ReportFormBase(BaseModel):
@@ -47,4 +47,4 @@ class ReportFormReadWithTemplate(ReportFormRead):
     """
     보고서 양식 정보와 연결된 템플릿 파일 정보를 함께 응답하기 위한 모델입니다.
     """
-    template_file: FileRead
+    template_file: shared_schemas.ResourceRead

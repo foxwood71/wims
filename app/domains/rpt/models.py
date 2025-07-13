@@ -7,7 +7,7 @@ from sqlmodel import Field, Relationship, SQLModel
 # 'shared' 도메인의 Image 모델을 타입 힌팅을 위해 임포트합니다.
 # 순환 참조를 방지하기 위해 TYPE_CHECKING 블록을 사용합니다.
 if TYPE_CHECKING:
-    from app.domains.shared.models import File
+    from app.domains.shared.models import Resource
 
 
 class ReportFormBase(SQLModel):
@@ -35,8 +35,7 @@ class ReportForm(ReportFormBase, table=True):
 
     #  데이터베이스 제약조건(Foreign Key)과 관계(Relationship)는 테이블 모델에서 명확히 정의합니다.
     #  Base의 template_file_id를 오버라이드하여 foreign_key를 추가합니다.
-    template_file_id: int = Field(foreign_key="shared.files.id")
+    template_file_id: int = Field(foreign_key="shared.resources.id")
 
-    #  shared.File 모델과의 관계를 설정합니다.
-    #  back_populates는 File 모델에 'report_forms'라는 이름의 관계가 정의되어 있다고 가정합니다.
-    template_file: "File" = Relationship(back_populates="report_forms")
+    # shared domain 관계 정의
+    template_file: "Resource" = Relationship(back_populates="report_forms")
