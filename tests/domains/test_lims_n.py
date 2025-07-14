@@ -89,7 +89,7 @@ async def test_test_request_fixture(
 
 
 @pytest_asyncio.fixture(name="test_sampling_point")
-async def test_sampling_point_fixture(db_session: AsyncSession, test_facility: loc_models.facility) -> lims_models.SamplingPoint:
+async def test_sampling_point_fixture(db_session: AsyncSession, test_facility: loc_models.Facility) -> lims_models.SamplingPoint:
     """테스트용 채수 지점(SamplingPoint)을 생성하고 반환합니다."""
     point = lims_models.SamplingPoint(
         code="FINAL-EFF", name="최종방류구", facility_id=test_facility.id
@@ -169,7 +169,7 @@ async def test_sample_fixture(
 
 @pytest_asyncio.fixture(name="test_instrument")
 async def test_instrument_fixture(
-    db_session: AsyncSession, test_facility: loc_models.facility, test_equipment_category: fms_models.EquipmentCategory
+    db_session: AsyncSession, test_facility: loc_models.Facility, test_equipment_category: fms_models.EquipmentCategory
 ) -> fms_models.Equipment:
     instrument = fms_models.Equipment(
         facility_id=test_facility.id,  # <<< 수정된 부분
@@ -330,7 +330,7 @@ async def test_test_request_template_fixture(db_session: AsyncSession, test_user
 
 @pytest_asyncio.fixture(name="test_pr_view")
 async def test_pr_view_fixture(
-    db_session: AsyncSession, test_user: usr_models.User, test_facility: loc_models.facility
+    db_session: AsyncSession, test_user: usr_models.User, test_facility: loc_models.Facility
 ) -> lims_models.PrView:
     pr_view = lims_models.PrView(
         name="My Custom View",

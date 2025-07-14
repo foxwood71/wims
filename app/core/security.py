@@ -124,7 +124,6 @@ async def get_current_user_from_token(
 
 
 # --- 역할 기반 권한 부여 의존성 ---
-
 def get_current_active_user(
     current_user: usr_models.User = Depends(get_current_user_from_token),
 ) -> usr_models.User:
@@ -138,16 +137,16 @@ def get_current_active_user(
 
 
 def get_current_admin_user(
-    # current_user: usr_models.User = Depends(get_current_user_from_token), ==> 이제까지 오류의 원인 token으로 받아서 꼬인거임 ㅜ.ㅜ
-    current_user: usr_models.User = Depends(get_current_active_user),
+    current_user: usr_models.User = Depends(get_current_user_from_token),
+    # current_user: usr_models.User = Depends(get_current_active_user),
 ) -> usr_models.User:
     """
     현재 인증된 관리자 사용자를 반환합니다 (role <= 10).
     관리자 권한이 없는 경우 403 Forbidden을 발생시킵니다.
     """
-    print(f"DEBUG: get_current_admin_user called for user_id: {current_user.user_id}")
-    print(f"DEBUG: current_user.role: {current_user.role} (value: {current_user.role.value})")
-    print(f"DEBUG: usr_models.UserRole.ADMIN: {usr_models.UserRole.ADMIN} (value: {usr_models.UserRole.ADMIN.value})")
+    print(f"DEBUG: security.py - get_current_admin_user called for user_id: {current_user.user_id}")
+    print(f"DEBUG: security.py - current_user.role: {current_user.role} (value: {current_user.role.value})")
+    print(f"DEBUG: security.py - usr_models.UserRole.ADMIN: {usr_models.UserRole.ADMIN} (value: {usr_models.UserRole.ADMIN.value})")
 
     # allowed_roles = [usr_models.UserRole.ADMIN, usr_models.UserRole.LAB_MANAGER,
     #                 usr_models.UserRole.FACILITY_MANAGER, usr_models.UserRole.INVENTORY_MANAGER]
@@ -162,7 +161,7 @@ def get_current_admin_user(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not enough permissions. Admin role required."
         )
-    print(f"DEBUG: Role '{current_user.role.name}' IS in allowed roles. Proceeding.")
+    print(f"DEBUG: security.py - Role '{current_user.role.name}' IS in allowed roles. Proceeding.")
     return current_user
 
 

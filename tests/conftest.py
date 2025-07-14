@@ -409,14 +409,14 @@ async def admin_client(
 #         main_app.dependency_overrides.update(original_overrides)  # 원본 오버라이드 복원
 
 
-# @pytest_asyncio.fixture(scope="function")
-# async def lab_manager_client(
-#     authorized_client_factory: Callable[..., AsyncGenerator[AsyncClient, None]],
-#     test_lab_manager: usr_models.User,
-# ) -> AsyncGenerator[AsyncClient, None]:
-#     """실험실 관리자로 인증된 클라이언트를 반환합니다."""
-#     async with authorized_client_factory(test_lab_manager, "labmgrpass123") as client:
-#         yield client
+@pytest_asyncio.fixture(scope="function")
+async def lab_manager_client(
+    authorized_client_factory: Callable[..., AsyncGenerator[AsyncClient, None]],
+    test_lab_manager: usr_models.User,
+) -> AsyncGenerator[AsyncClient, None]:
+    """실험실 관리자로 인증된 클라이언트를 반환합니다."""
+    async with authorized_client_factory(test_lab_manager, "labmgrpass123") as client:
+        yield client
 
 
 @pytest_asyncio.fixture(scope="function")
