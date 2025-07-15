@@ -27,10 +27,10 @@
 """
 
 from typing import Any
-
 import pytest
-from fastapi.testclient import TestClient
+from httpx import AsyncClient
 from sqlmodel import Session  # , select
+# from fastapi.testclient import TestClient
 
 
 # 다른 도메인의 모델을 참조하는 경우 필요
@@ -49,7 +49,7 @@ from app.domains.loc import crud as loc_crud
 
 @pytest.mark.asyncio
 async def test_create_facility_success_admin(
-    admin_client: TestClient,  # 관리자로 인증된 클라이언트
+    admin_client: AsyncClient,  # 관리자로 인증된 클라이언트
 ):
     """
     관리자 권한으로 새로운 하수처리장을 성공적으로 생성하는지 테스트합니다.
@@ -76,7 +76,7 @@ async def test_create_facility_success_admin(
 
 @pytest.mark.asyncio
 async def test_create_facility_duplicate_name_admin(
-    admin_client: TestClient,
+    admin_client: AsyncClient,
     db_session: Session,  # 데이터베이스에 플랜트 미리 생성하기 위해
 ):
     """
@@ -103,7 +103,7 @@ async def test_create_facility_duplicate_name_admin(
 
 @pytest.mark.asyncio
 async def test_create_facility_duplicate_code_admin(
-    admin_client: TestClient,
+    admin_client: AsyncClient,
     db_session: Session,
 ):
     """
@@ -131,8 +131,8 @@ async def test_create_facility_duplicate_code_admin(
 
 @pytest.mark.asyncio
 async def test_create_facility_unauthorized(
-    authorized_client: TestClient,  # 일반 사용자로 인증된 클라이언트
-    client: TestClient,  # 비인증 클라이언트
+    authorized_client: AsyncClient,  # 일반 사용자로 인증된 클라이언트
+    client: AsyncClient,  # 비인증 클라이언트
 ):
     """
     일반 사용자 및 비인증 사용자가 하수처리장 생성 시도 시 403 Forbidden 또는 401 Unauthorized를 반환하는지 테스트합니다.
@@ -158,7 +158,7 @@ async def test_create_facility_unauthorized(
 
 
 @pytest.mark.asyncio
-async def test_read_facilitiess_success(client: TestClient, db_session: Session):
+async def test_read_facilitiess_success(client: AsyncClient, db_session: Session):
     """
     모든 사용자가 하수처리장 목록을 성공적으로 조회하는지 테스트합니다.
     (권한이 필요 없는 GET 엔드포인트로 가정)
@@ -184,7 +184,7 @@ async def test_read_facilitiess_success(client: TestClient, db_session: Session)
 
 
 @pytest.mark.asyncio
-async def test_read_facility_success(client: TestClient, db_session: Session):
+async def test_read_facility_success(client: AsyncClient, db_session: Session):
     """
     특정 ID의 하수처리장 정보를 성공적으로 조회하는지 테스트합니다.
     """
@@ -206,7 +206,7 @@ async def test_read_facility_success(client: TestClient, db_session: Session):
 
 
 @pytest.mark.asyncio
-async def test_read_facility_not_found(client: TestClient):
+async def test_read_facility_not_found(client: AsyncClient):
     """
     존재하지 않는 ID의 하수처리장 조회 시 404 Not Found를 반환하는지 테스트합니다.
     """
@@ -222,7 +222,7 @@ async def test_read_facility_not_found(client: TestClient):
 
 
 @pytest.mark.asyncio
-async def test_update_facility_success_admin(admin_client: TestClient, db_session: Session):
+async def test_update_facility_success_admin(admin_client: AsyncClient, db_session: Session):
     """
     관리자 권한으로 하수처리장 정보를 성공적으로 업데이트하는지 테스트합니다.
     """
@@ -246,7 +246,7 @@ async def test_update_facility_success_admin(admin_client: TestClient, db_sessio
 
 
 @pytest.mark.asyncio
-async def test_update_facility_duplicate_name_on_update_admin(admin_client: TestClient, db_session: Session):
+async def test_update_facility_duplicate_name_on_update_admin(admin_client: AsyncClient, db_session: Session):
     """
     관리자 권한으로 하수처리장 이름 업데이트 시, 다른 하수처리장과 이름이 중복되는 경우 400 Bad Request를 반환하는지 테스트합니다.
 
@@ -271,7 +271,7 @@ async def test_update_facility_duplicate_name_on_update_admin(admin_client: Test
 
 
 @pytest.mark.asyncio
-async def test_update_facility_duplicate_code_on_update_admin(admin_client: TestClient, db_session: Session):
+async def test_update_facility_duplicate_code_on_update_admin(admin_client: AsyncClient, db_session: Session):
     """
     관리자 권한으로 하수처리장 코드 업데이트 시, 다른 하수처리장과 코드가 중복되는 경우 400 Bad Request를 반환하는지 테스트합니다.
 
@@ -297,7 +297,7 @@ async def test_update_facility_duplicate_code_on_update_admin(admin_client: Test
 
 @pytest.mark.asyncio
 async def test_update_facility_unauthorized(
-    authorized_client: TestClient, client: TestClient, db_session: Session
+    authorized_client: AsyncClient, client: AsyncClient, db_session: Session
 ):
     """
     일반 사용자 및 비인증 사용자가 하수처리장 업데이트 시도 시 403 Forbidden 또는 401 Unauthorized를 반환하는지 테스트합니다.
@@ -325,7 +325,7 @@ async def test_update_facility_unauthorized(
 
 
 @pytest.mark.asyncio
-async def test_delete_facility_success_admin(admin_client: TestClient, db_session: Session):
+async def test_delete_facility_success_admin(admin_client: AsyncClient, db_session: Session):
     """
     관리자 권한으로 하수처리장을 성공적으로 삭제하는지 테스트합니다.
     """
@@ -348,7 +348,7 @@ async def test_delete_facility_success_admin(admin_client: TestClient, db_sessio
 
 @pytest.mark.asyncio
 async def test_delete_facility_unauthorized(
-    authorized_client: TestClient, client: TestClient, db_session: Session
+    authorized_client: AsyncClient, client: AsyncClient, db_session: Session
 ):
     """
     일반 사용자 및 비인증 사용자가 하수처리장 삭제 시도 시 403 Forbidden 또는 401 Unauthorized를 반환하는지 테스트합니다.
@@ -374,7 +374,7 @@ async def test_delete_facility_unauthorized(
 
 
 @pytest.mark.asyncio
-async def test_delete_facility_restrict_by_location(admin_client: TestClient, db_session: Session):
+async def test_delete_facility_restrict_by_location(admin_client: AsyncClient, db_session: Session):
     """
     하수처리장에 연결된 장소가 있을 때 하수처리장 삭제 시도 시 400 Bad Request를 반환하는지 테스트합니다.
     (ON DELETE RESTRICT 제약 조건 검증)
@@ -417,7 +417,7 @@ async def test_delete_facility_restrict_by_location(admin_client: TestClient, db
 
 
 @pytest.mark.asyncio
-async def test_delete_facility_restrict_by_equipment(admin_client: TestClient, db_session: Session, test_equipment_category: Any):
+async def test_delete_facility_restrict_by_equipment(admin_client: AsyncClient, db_session: Session, test_equipment_category: Any):
     """
     하수처리장에 연결된 설비가 있을 때 하수처리장 삭제 시도 시 삭제가 제한되는지 테스트합니다.
     (ON DELETE RESTRICT 제약 조건 검증)
@@ -456,7 +456,7 @@ async def test_delete_facility_restrict_by_equipment(admin_client: TestClient, d
 
 @pytest.mark.asyncio
 async def test_create_location_type_success_admin(
-    admin_client: TestClient,
+    admin_client: AsyncClient,
 ):
     """
     관리자 권한으로 새로운 장소 유형을 성공적으로 생성하는지 테스트합니다.
@@ -475,7 +475,7 @@ async def test_create_location_type_success_admin(
 
 
 @pytest.mark.asyncio
-async def test_create_location_type_duplicate_name_admin(admin_client: TestClient, db_session: Session):
+async def test_create_location_type_duplicate_name_admin(admin_client: AsyncClient, db_session: Session):
     """
     관리자 권한으로 이미 존재하는 이름의 장소 유형 생성 시도 시 400 Bad Request를 반환하는지 테스트합니다.
     """
@@ -498,7 +498,7 @@ async def test_create_location_type_duplicate_name_admin(admin_client: TestClien
 
 
 @pytest.mark.asyncio
-async def test_create_location_type_unauthorized(authorized_client: TestClient, client: TestClient):
+async def test_create_location_type_unauthorized(authorized_client: AsyncClient, client: AsyncClient):
     """
     일반 사용자 및 비인증 사용자가 장소 유형 생성 시도 시 403 Forbidden 또는 401 Unauthorized를 반환하는지 테스트합니다.
     """
@@ -522,7 +522,7 @@ async def test_create_location_type_unauthorized(authorized_client: TestClient, 
 
 
 @pytest.mark.asyncio
-async def test_read_location_types_success(client: TestClient, db_session: Session):
+async def test_read_location_types_success(client: AsyncClient, db_session: Session):
     """
     모든 사용자가 장소 유형 목록을 성공적으로 조회하는지 테스트합니다.
     """
@@ -547,7 +547,7 @@ async def test_read_location_types_success(client: TestClient, db_session: Sessi
 
 
 @pytest.mark.asyncio
-async def test_read_location_type_success(client: TestClient, db_session: Session):
+async def test_read_location_type_success(client: AsyncClient, db_session: Session):
     """
     특정 ID의 장소 유형 정보를 성공적으로 조회하는지 테스트합니다.
     """
@@ -569,7 +569,7 @@ async def test_read_location_type_success(client: TestClient, db_session: Sessio
 
 
 @pytest.mark.asyncio
-async def test_read_location_type_not_found(client: TestClient):
+async def test_read_location_type_not_found(client: AsyncClient):
     """
     존재하지 않는 ID의 장소 유형 조회 시 404 Not Found를 반환하는지 테스트합니다.
     """
@@ -585,7 +585,7 @@ async def test_read_location_type_not_found(client: TestClient):
 
 
 @pytest.mark.asyncio
-async def test_update_location_type_success_admin(admin_client: TestClient, db_session: Session):
+async def test_update_location_type_success_admin(admin_client: AsyncClient, db_session: Session):
     """
     관리자 권한으로 장소 유형 정보를 성공적으로 업데이트하는지 테스트합니다.
     """
@@ -609,7 +609,7 @@ async def test_update_location_type_success_admin(admin_client: TestClient, db_s
 
 
 @pytest.mark.asyncio
-async def test_update_location_type_duplicate_name_on_update_admin(admin_client: TestClient, db_session: Session):
+async def test_update_location_type_duplicate_name_on_update_admin(admin_client: AsyncClient, db_session: Session):
     """
     관리자 권한으로 장소 유형 이름 업데이트 시, 다른 장소 유형과 이름이 중복되는 경우 400 Bad Request를 반환하는지 테스트합니다.
 
@@ -635,7 +635,7 @@ async def test_update_location_type_duplicate_name_on_update_admin(admin_client:
 
 @pytest.mark.asyncio
 async def test_update_location_type_unauthorized(
-    authorized_client: TestClient, client: TestClient, db_session: Session
+    authorized_client: AsyncClient, client: AsyncClient, db_session: Session
 ):
     """
     일반 사용자 및 비인증 사용자가 장소 유형 업데이트 시도 시 403 Forbidden 또는 401 Unauthorized를 반환하는지 테스트합니다.
@@ -663,7 +663,7 @@ async def test_update_location_type_unauthorized(
 
 
 @pytest.mark.asyncio
-async def test_delete_location_type_success_admin(admin_client: TestClient, db_session: Session):
+async def test_delete_location_type_success_admin(admin_client: AsyncClient, db_session: Session):
     """
     관리자 권한으로 장소 유형을 성공적으로 삭제하는지 테스트합니다.
     """
@@ -686,7 +686,7 @@ async def test_delete_location_type_success_admin(admin_client: TestClient, db_s
 
 @pytest.mark.asyncio
 async def test_delete_location_type_unauthorized(
-    authorized_client: TestClient, client: TestClient, db_session: Session
+    authorized_client: AsyncClient, client: AsyncClient, db_session: Session
 ):
     """
     일반 사용자 및 비인증 사용자가 장소 유형 삭제 시도 시 403 Forbidden 또는 401 Unauthorized를 반환하는지 테스트합니다.
@@ -713,7 +713,7 @@ async def test_delete_location_type_unauthorized(
 
 @pytest.mark.asyncio
 async def test_delete_location_type_restrict_by_location(
-    admin_client: TestClient, db_session: Session, test_facility: loc_models.Facility
+    admin_client: AsyncClient, db_session: Session, test_facility: loc_models.Facility
 ):
     """
     장소 유형에 연결된 장소가 있을 때 장소 유형 삭제 시도 시 400 Bad Request를 반환하는지 테스트합니다.
@@ -749,7 +749,7 @@ async def test_delete_location_type_restrict_by_location(
 
 # --- 실제 장소 관리 엔드포인트 테스트 (보완) ---
 @pytest.mark.asyncio
-async def test_create_location_success_admin(admin_client: TestClient, db_session: Session):
+async def test_create_location_success_admin(admin_client: AsyncClient, db_session: Session):
     """
     관리자 권한으로 새로운 장소를 성공적으로 생성하는지 테스트합니다.
     """
@@ -781,7 +781,7 @@ async def test_create_location_success_admin(admin_client: TestClient, db_sessio
 
 
 @pytest.mark.asyncio
-async def test_create_location_duplicate_name_in_plant_admin(admin_client: TestClient, db_session: Session):
+async def test_create_location_duplicate_name_in_plant_admin(admin_client: AsyncClient, db_session: Session):
     """
     동일 처리장 내에서 중복 이름의 장소 (및 상위 위치가 동일한) 생성 시도 시 400 Bad Request를 반환하는지 테스트합니다.
 
@@ -820,7 +820,7 @@ async def test_create_location_duplicate_name_in_plant_admin(admin_client: TestC
 
 @pytest.mark.asyncio
 async def test_create_location_with_nonexistent_plant_admin(
-    admin_client: TestClient,
+    admin_client: AsyncClient,
 ):
     """
     관리자 권한으로 존재하지 않는 처리장 ID로 장소 생성 시도 시 400 Bad Request를 반환하는지 테스트합니다.
@@ -842,7 +842,7 @@ async def test_create_location_with_nonexistent_plant_admin(
 
 @pytest.mark.asyncio
 async def test_create_location_unauthorized(
-    authorized_client: TestClient, client: TestClient, db_session: Session, test_facility: loc_models.Facility
+    authorized_client: AsyncClient, client: AsyncClient, db_session: Session, test_facility: loc_models.Facility
 ):
     """
     일반 사용자 및 비인증 사용자가 장소 생성 시도 시 403 Forbidden 또는 401 Unauthorized를 반환하는지 테스트합니다.
@@ -869,7 +869,7 @@ async def test_create_location_unauthorized(
 
 @pytest.mark.asyncio
 async def test_create_location_with_nonexistent_location_type_admin(
-    admin_client: TestClient, db_session: Session, test_facility: loc_models.Facility
+    admin_client: AsyncClient, db_session: Session, test_facility: loc_models.Facility
 ):
     """
     관리자 권한으로 존재하지 않는 장소 유형 ID로 장소 생성 시도 시 400 Bad Request를 반환하는지 테스트합니다.
@@ -892,7 +892,7 @@ async def test_create_location_with_nonexistent_location_type_admin(
 
 @pytest.mark.asyncio
 async def test_create_location_with_nonexistent_parent_location_admin(
-    admin_client: TestClient, db_session: Session, test_facility: loc_models.Facility
+    admin_client: AsyncClient, db_session: Session, test_facility: loc_models.Facility
 ):
     """
     관리자 권한으로 존재하지 않는 상위 장소 ID로 장소 생성 시도 시 400 Bad Request를 반환하는지 테스트합니다.
@@ -915,7 +915,7 @@ async def test_create_location_with_nonexistent_parent_location_admin(
 
 @pytest.mark.asyncio
 async def test_create_location_with_parent_from_different_plant_admin(
-    admin_client: TestClient, db_session: Session
+    admin_client: AsyncClient, db_session: Session
 ):
     """
     관리자 권한으로 다른 처리장의 상위 장소 ID로 장소 생성 시도 시 400 Bad Request를 반환하는지 테스트합니다.
@@ -950,7 +950,7 @@ async def test_create_location_with_parent_from_different_plant_admin(
 
 
 @pytest.mark.asyncio
-async def test_read_locations_by_facility_id_success(client: TestClient, db_session: Session):
+async def test_read_locations_by_facility_id_success(client: AsyncClient, db_session: Session):
     """
     특정 처리장 ID로 장소 목록을 성공적으로 조회하는지 테스트합니다.
     """
@@ -988,7 +988,7 @@ async def test_read_locations_by_facility_id_success(client: TestClient, db_sess
 
 
 @pytest.mark.asyncio
-async def test_read_locations_no_facility_id_success(client: TestClient, db_session: Session):
+async def test_read_locations_no_facility_id_success(client: AsyncClient, db_session: Session):
     """
     facility_id 필터 없이 모든 장소 목록을 성공적으로 조회하는지 테스트합니다.
     """
@@ -1022,7 +1022,7 @@ async def test_read_locations_no_facility_id_success(client: TestClient, db_sess
 
 
 @pytest.mark.asyncio
-async def test_read_location_success(client: TestClient, db_session: Session):
+async def test_read_location_success(client: AsyncClient, db_session: Session):
     """
     특정 ID의 장소 정보를 성공적으로 조회하는지 테스트합니다.
     """
@@ -1049,7 +1049,7 @@ async def test_read_location_success(client: TestClient, db_session: Session):
 
 
 @pytest.mark.asyncio
-async def test_read_location_not_found(client: TestClient):
+async def test_read_location_not_found(client: AsyncClient):
     """
     존재하지 않는 ID의 장소 조회 시 404 Not Found를 반환하는지 테스트합니다.
     """
@@ -1065,7 +1065,7 @@ async def test_read_location_not_found(client: TestClient):
 
 
 @pytest.mark.asyncio
-async def test_update_location_success_admin(admin_client: TestClient, db_session: Session):
+async def test_update_location_success_admin(admin_client: AsyncClient, db_session: Session):
     """
     관리자 권한으로 장소 정보를 성공적으로 업데이트하는지 테스트합니다.
     """
@@ -1098,7 +1098,7 @@ async def test_update_location_success_admin(admin_client: TestClient, db_sessio
 
 
 @pytest.mark.asyncio
-async def test_update_location_duplicate_name_in_plant_on_update_admin(admin_client: TestClient, db_session: Session):
+async def test_update_location_duplicate_name_in_plant_on_update_admin(admin_client: AsyncClient, db_session: Session):
     """
     장소 이름 업데이트 시, 동일 처리장 내에서 이름 및 부모 장소 ID 조합이 중복되는 경우 400 Bad Request를 반환하는지 테스트합니다.
 
@@ -1128,7 +1128,7 @@ async def test_update_location_duplicate_name_in_plant_on_update_admin(admin_cli
 
 
 @pytest.mark.asyncio
-async def test_update_location_change_plant_to_nonexistent_admin(admin_client: TestClient, db_session: Session):
+async def test_update_location_change_plant_to_nonexistent_admin(admin_client: AsyncClient, db_session: Session):
     """
     장소의 facility_id를 존재하지 않는 ID로 변경 시도 시 400 Bad Request를 반환하는지 테스트합니다.
 
@@ -1155,7 +1155,7 @@ async def test_update_location_change_plant_to_nonexistent_admin(admin_client: T
 
 
 @pytest.mark.asyncio
-async def test_update_location_change_location_type_to_nonexistent_admin(admin_client: TestClient, db_session: Session):
+async def test_update_location_change_location_type_to_nonexistent_admin(admin_client: AsyncClient, db_session: Session):
     """
     장소의 location_type_id를 존재하지 않는 ID로 변경 시도 시 400 Bad Request를 반환하는지 테스트합니다.
 
@@ -1182,7 +1182,7 @@ async def test_update_location_change_location_type_to_nonexistent_admin(admin_c
 
 
 @pytest.mark.asyncio
-async def test_update_location_change_parent_to_nonexistent_admin(admin_client: TestClient, db_session: Session):
+async def test_update_location_change_parent_to_nonexistent_admin(admin_client: AsyncClient, db_session: Session):
     """
     장소의 parent_location_id를 존재하지 않는 ID로 변경 시도 시 400 Bad Request를 반환하는지 테스트합니다.
 
@@ -1209,7 +1209,7 @@ async def test_update_location_change_parent_to_nonexistent_admin(admin_client: 
 
 
 @pytest.mark.asyncio
-async def test_update_location_change_parent_to_different_plant_admin(admin_client: TestClient, db_session: Session):
+async def test_update_location_change_parent_to_different_plant_admin(admin_client: AsyncClient, db_session: Session):
     """
     장소의 parent_location_id를 다른 처리장에 속한 장소로 변경 시도 시 400 Bad Request를 반환하는지 테스트합니다.
 
@@ -1243,7 +1243,7 @@ async def test_update_location_change_parent_to_different_plant_admin(admin_clie
 
 @pytest.mark.asyncio
 async def test_update_location_unauthorized(
-    authorized_client: TestClient, client: TestClient, db_session: Session, test_facility: loc_models.Facility
+    authorized_client: AsyncClient, client: AsyncClient, db_session: Session, test_facility: loc_models.Facility
 ):
     """
     일반 사용자 및 비인증 사용자가 장소 업데이트 시도 시 403 Forbidden 또는 401 Unauthorized를 반환하는지 테스트합니다.
@@ -1271,7 +1271,7 @@ async def test_update_location_unauthorized(
 
 
 @pytest.mark.asyncio
-async def test_delete_location_success_admin(admin_client: TestClient, db_session: Session):
+async def test_delete_location_success_admin(admin_client: AsyncClient, db_session: Session):
     """
     관리자 권한으로 장소를 성공적으로 삭제하는지 테스트합니다.
     """
@@ -1299,7 +1299,7 @@ async def test_delete_location_success_admin(admin_client: TestClient, db_sessio
 
 @pytest.mark.asyncio
 async def test_delete_location_unauthorized(
-    authorized_client: TestClient, client: TestClient, db_session: Session, test_facility: loc_models.Facility
+    authorized_client: AsyncClient, client: AsyncClient, db_session: Session, test_facility: loc_models.Facility
 ):
     """
     일반 사용자 및 비인증 사용자가 장소 삭제 시도 시 403 Forbidden 또는 401 Unauthorized를 반환하는지 테스트합니다.
@@ -1326,7 +1326,7 @@ async def test_delete_location_unauthorized(
 
 @pytest.mark.asyncio
 async def test_delete_location_cascade_child_locations_admin(
-    admin_client: TestClient, db_session: Session, test_facility: loc_models.Facility
+    admin_client: AsyncClient, db_session: Session, test_facility: loc_models.Facility
 ):
     """
     부모 장소 삭제 시 하위 장소도 연쇄적으로 삭제되는지 테스트합니다.
@@ -1365,7 +1365,7 @@ async def test_delete_location_cascade_child_locations_admin(
 
 @pytest.mark.asyncio
 async def test_delete_location_restrict_by_equipment(
-    admin_client: TestClient,
+    admin_client: AsyncClient,
     db_session: Session,
     test_facility: loc_models.Facility,
     test_equipment_category: Any,  # EquipmentCategory 픽스처 필요

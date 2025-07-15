@@ -6,6 +6,7 @@ from sqlalchemy.orm import selectinload
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.domains.shared import crud as shared_crud
 from . import models, schemas
 
 
@@ -13,6 +14,18 @@ async def create_report_form(
     db: AsyncSession, *, form_in: schemas.ReportFormCreate
 ) -> models.ReportForm:
     """새로운 보고서 양식을 생성합니다."""
+    # [수정] template_file_id 유효성 검사 추가
+    # shared.resources 테이블에서 template_file_id에 해당하는 리소스가 존재하는지 확인합니다.
+    existing_file = await shared_crud.resource.get(db, id=form_in.template_file_id)
+    if not existing_file:
+        # 파일이 존재하지 않으면, 404 Not Found 예외를 발생시킵니다.
+        # 이 예외는 라우터에서 포착되어 HTTP 404 응답으로 변환됩니다.
+        from fastapi import HTTPException, status
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Template file with ID {form_in.template_file_id} not found."
+        )
+
     db_obj = models.ReportForm.model_validate(form_in)
     db.add(db_obj)
     await db.commit()

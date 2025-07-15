@@ -31,8 +31,10 @@
 """
 
 import pytest
-from fastapi.testclient import TestClient
+from httpx import AsyncClient
 from sqlmodel import Session
+# from fastapi.testclient import TestClient
+
 from app.domains.ven import models as vendor_models
 from app.domains.ven import schemas as vendor_schemas
 from app.domains.ven.crud import vendor_category as vendor_category_crud  # CRUD 직접 사용 (테스트 셋업용)
@@ -46,7 +48,7 @@ from app.domains.ven.crud import vendor_contact as vendor_contact_crud
 
 @pytest.mark.asyncio
 async def test_create_vendor_category_success_admin(
-    admin_client: TestClient,  # 관리자로 인증된 클라이언트
+    admin_client: AsyncClient,  # 관리자로 인증된 클라이언트
 ):
     """
     관리자 권한으로 새로운 공급업체 카테고리를 성공적으로 생성하는지 테스트합니다.
@@ -66,7 +68,7 @@ async def test_create_vendor_category_success_admin(
 
 @pytest.mark.asyncio
 async def test_create_vendor_category_duplicate_name_admin(
-    admin_client: TestClient,
+    admin_client: AsyncClient,
     db_session: Session,  # 데이터베이스에 카테고리 미리 생성하기 위해
 ):
     """
@@ -92,8 +94,8 @@ async def test_create_vendor_category_duplicate_name_admin(
 
 @pytest.mark.asyncio
 async def test_create_vendor_category_unauthorized(
-    authorized_client: TestClient,  # 일반 사용자로 인증된 클라이언트
-    client: TestClient,  # 비인증 클라이언트
+    authorized_client: AsyncClient,  # 일반 사용자로 인증된 클라이언트
+    client: AsyncClient,  # 비인증 클라이언트
 ):
     """
     일반 사용자 및 비인증 사용자가 공급업체 카테고리 생성 시도 시 403 Forbidden 또는 401 Unauthorized를 반환하는지 테스트합니다.
@@ -118,7 +120,7 @@ async def test_create_vendor_category_unauthorized(
 
 
 @pytest.mark.asyncio
-async def test_read_vendor_categories_success(client: TestClient, db_session: Session):
+async def test_read_vendor_categories_success(client: AsyncClient, db_session: Session):
     """
     모든 사용자가 공급업체 카테고리 목록을 성공적으로 조회하는지 테스트합니다.
     """
@@ -143,7 +145,7 @@ async def test_read_vendor_categories_success(client: TestClient, db_session: Se
 
 
 @pytest.mark.asyncio
-async def test_read_single_vendor_category_success(client: TestClient, db_session: Session):
+async def test_read_single_vendor_category_success(client: AsyncClient, db_session: Session):
     """
     특정 ID의 공급업체 카테고리를 성공적으로 조회하는지 테스트합니다.
     """
@@ -165,7 +167,7 @@ async def test_read_single_vendor_category_success(client: TestClient, db_sessio
 
 
 @pytest.mark.asyncio
-async def test_read_single_vendor_category_not_found(client: TestClient):
+async def test_read_single_vendor_category_not_found(client: AsyncClient):
     """
     존재하지 않는 ID의 공급업체 카테고리 조회 시 404 Not Found를 반환하는지 테스트합니다.
     """
@@ -182,7 +184,7 @@ async def test_read_single_vendor_category_not_found(client: TestClient):
 
 @pytest.mark.asyncio
 async def test_update_vendor_category_success_admin(
-    admin_client: TestClient, db_session: Session
+    admin_client: AsyncClient, db_session: Session
 ):
     """
     관리자 권한으로 공급업체 카테고리 정보를 성공적으로 업데이트하는지 테스트합니다.
@@ -212,7 +214,7 @@ async def test_update_vendor_category_success_admin(
 
 @pytest.mark.asyncio
 async def test_update_vendor_category_unauthorized(
-    authorized_client: TestClient, client: TestClient, db_session: Session
+    authorized_client: AsyncClient, client: AsyncClient, db_session: Session
 ):
     """
     일반 사용자 및 비인증 사용자가 공급업체 카테고리 업데이트 시도 시 403 Forbidden 또는 401 Unauthorized를 반환하는지 테스트합니다.
@@ -245,7 +247,7 @@ async def test_update_vendor_category_unauthorized(
 
 @pytest.mark.asyncio
 async def test_delete_vendor_category_success_admin(
-    admin_client: TestClient, db_session: Session
+    admin_client: AsyncClient, db_session: Session
 ):
     """
     관리자 권한으로 공급업체 카테고리를 성공적으로 삭제하는지 테스트합니다.
@@ -285,7 +287,7 @@ async def test_delete_vendor_category_success_admin(
 
 @pytest.mark.asyncio
 async def test_delete_vendor_category_unauthorized(
-    authorized_client: TestClient, client: TestClient, db_session: Session
+    authorized_client: AsyncClient, client: AsyncClient, db_session: Session
 ):
     """
     일반 사용자 및 비인증 사용자가 공급업체 카테고리 삭제 시도 시 403 Forbidden 또는 401 Unauthorized를 반환하는지 테스트합니다.
@@ -312,7 +314,7 @@ async def test_delete_vendor_category_unauthorized(
 
 @pytest.mark.asyncio
 async def test_delete_vendor_category_relinks_vendors_to_default(
-    admin_client: TestClient, db_session: Session
+    admin_client: AsyncClient, db_session: Session
 ):
     """
     공급업체 카테고리 삭제 시, 해당 카테고리에 연결된 공급업체가 '분류없음' 카테고리로 재연결되는지 테스트합니다.
@@ -390,7 +392,7 @@ async def test_delete_vendor_category_relinks_vendors_to_default(
 # --- 공급업체 관리 엔드포인트 테스트 (보완) ---
 @pytest.mark.asyncio
 async def test_create_vendor_duplicate_business_number_admin(
-    admin_client: TestClient, db_session: Session
+    admin_client: AsyncClient, db_session: Session
 ):
     """
     관리자 권한으로 이미 존재하는 사업자 등록 번호의 공급업체를 생성 시도 시 400 Bad Request를 반환하는지 테스트합니다.
@@ -415,7 +417,7 @@ async def test_create_vendor_duplicate_business_number_admin(
 
 
 @pytest.mark.asyncio
-async def test_read_single_vendor_with_details_success(client: TestClient, db_session: Session):
+async def test_read_single_vendor_with_details_success(client: AsyncClient, db_session: Session):
     """
     특정 ID의 공급업체를 상세 정보(담당자 포함)와 함께 성공적으로 조회하는지 테스트합니다.
     """
@@ -453,7 +455,7 @@ async def test_read_single_vendor_with_details_success(client: TestClient, db_se
 
 
 @pytest.mark.asyncio
-async def test_read_single_vendor_not_found(client: TestClient):
+async def test_read_single_vendor_not_found(client: AsyncClient):
     """
     존재하지 않는 ID의 공급업체 조회 시 404 Not Found를 반환하는지 테스트합니다.
     """
@@ -470,7 +472,7 @@ async def test_read_single_vendor_not_found(client: TestClient):
 
 @pytest.mark.asyncio
 async def test_update_vendor_success_admin(
-    admin_client: TestClient, db_session: Session
+    admin_client: AsyncClient, db_session: Session
 ):
     """
     관리자 권한으로 공급업체 정보를 성공적으로 업데이트하는지 테스트합니다.
@@ -496,7 +498,7 @@ async def test_update_vendor_success_admin(
 
 @pytest.mark.asyncio
 async def test_update_vendor_unauthorized(
-    authorized_client: TestClient, client: TestClient, db_session: Session
+    authorized_client: AsyncClient, client: AsyncClient, db_session: Session
 ):
     """
     일반 사용자 및 비인증 사용자가 공급업체 업데이트 시도 시 403 Forbidden 또는 401 Unauthorized를 반환하는지 테스트합니다.
@@ -525,7 +527,7 @@ async def test_update_vendor_unauthorized(
 
 @pytest.mark.asyncio
 async def test_delete_vendor_success_admin(
-    admin_client: TestClient, db_session: Session
+    admin_client: AsyncClient, db_session: Session
 ):
     """
     관리자 권한으로 공급업체를 성공적으로 삭제하는지 테스트합니다.
@@ -549,7 +551,7 @@ async def test_delete_vendor_success_admin(
 
 @pytest.mark.asyncio
 async def test_delete_vendor_unauthorized(
-    authorized_client: TestClient, client: TestClient, db_session: Session
+    authorized_client: AsyncClient, client: AsyncClient, db_session: Session
 ):
     """
     일반 사용자 및 비인증 사용자가 공급업체 삭제 시도 시 403 Forbidden 또는 401 Unauthorized를 반환하는지 테스트합니다.
@@ -579,7 +581,7 @@ async def test_delete_vendor_unauthorized(
 
 @pytest.mark.asyncio
 async def test_add_vendor_category_to_vendor_success_admin(
-    admin_client: TestClient, db_session: Session
+    admin_client: AsyncClient, db_session: Session
 ):
     """
     관리자 권한으로 공급업체에 카테고리를 성공적으로 연결하는지 테스트합니다.
@@ -607,7 +609,7 @@ async def test_add_vendor_category_to_vendor_success_admin(
 
 @pytest.mark.asyncio
 async def test_add_vendor_category_to_vendor_duplicate_admin(
-    admin_client: TestClient, db_session: Session
+    admin_client: AsyncClient, db_session: Session
 ):
     """
     관리자 권한으로 이미 연결된 공급업체-카테고리를 다시 연결 시도 시 400 Bad Request를 반환하는지 테스트합니다.
@@ -641,7 +643,7 @@ async def test_add_vendor_category_to_vendor_duplicate_admin(
 
 @pytest.mark.asyncio
 async def test_add_vendor_category_to_vendor_invalid_vendor_id(
-    admin_client: TestClient, db_session: Session
+    admin_client: AsyncClient, db_session: Session
 ):
     """
     유효하지 않은 공급업체 ID로 카테고리 연결 시도 시 404 Not Found를 반환하는지 테스트합니다.
@@ -665,7 +667,7 @@ async def test_add_vendor_category_to_vendor_invalid_vendor_id(
 
 @pytest.mark.asyncio
 async def test_add_vendor_category_to_vendor_invalid_category_id(
-    admin_client: TestClient, db_session: Session
+    admin_client: AsyncClient, db_session: Session
 ):
     """
     유효하지 않은 카테고리 ID로 카테고리 연결 시도 시 404 Not Found를 반환하는지 테스트합니다.
@@ -691,7 +693,7 @@ async def test_add_vendor_category_to_vendor_invalid_category_id(
 
 @pytest.mark.asyncio
 async def test_read_vendor_categories_for_vendor_success(
-    client: TestClient, db_session: Session
+    client: AsyncClient, db_session: Session
 ):
     """
     특정 공급업체에 연결된 카테고리 목록을 성공적으로 조회하는지 테스트합니다.
@@ -728,7 +730,7 @@ async def test_read_vendor_categories_for_vendor_success(
 
 @pytest.mark.asyncio
 async def test_remove_vendor_category_from_vendor_success_admin(
-    admin_client: TestClient, db_session: Session
+    admin_client: AsyncClient, db_session: Session
 ):
     """
     관리자 권한으로 공급업체와 카테고리 간의 연결을 성공적으로 해제하는지 테스트합니다.
@@ -767,7 +769,7 @@ async def test_remove_vendor_category_from_vendor_success_admin(
 
 @pytest.mark.asyncio
 async def test_remove_vendor_category_from_vendor_link_not_found(
-    admin_client: TestClient,
+    admin_client: AsyncClient,
 ):
     """
     존재하지 않는 공급업체-카테고리 연결 해제 시도 시 404 Not Found를 반환하는지 테스트합니다.
@@ -796,7 +798,7 @@ async def test_remove_vendor_category_from_vendor_link_not_found(
 
 @pytest.mark.asyncio
 async def test_create_vendor_contact_success_admin(
-    admin_client: TestClient, db_session: Session
+    admin_client: AsyncClient, db_session: Session
 ):
     """
     관리자 권한으로 새로운 공급업체 담당자를 성공적으로 생성하는지 테스트합니다.
@@ -826,7 +828,7 @@ async def test_create_vendor_contact_success_admin(
 
 @pytest.mark.asyncio
 async def test_create_vendor_contact_invalid_vendor_id(
-    admin_client: TestClient,
+    admin_client: AsyncClient,
 ):
     """
     유효하지 않은 공급업체 ID로 담당자 생성 시도 시 404 Not Found를 반환하는지 테스트합니다.
@@ -853,7 +855,7 @@ async def test_create_vendor_contact_invalid_vendor_id(
 
 @pytest.mark.asyncio
 async def test_read_vendor_contacts_for_vendor_success(
-    client: TestClient, db_session: Session
+    client: AsyncClient, db_session: Session
 ):
     """
     특정 공급업체에 속한 담당자 목록을 성공적으로 조회하는지 테스트합니다.
@@ -886,7 +888,7 @@ async def test_read_vendor_contacts_for_vendor_success(
 
 
 @pytest.mark.asyncio
-async def test_read_single_vendor_contact_success(client: TestClient, db_session: Session):
+async def test_read_single_vendor_contact_success(client: AsyncClient, db_session: Session):
     """
     특정 ID의 공급업체 담당자를 성공적으로 조회하는지 테스트합니다.
     """
@@ -914,7 +916,7 @@ async def test_read_single_vendor_contact_success(client: TestClient, db_session
 
 
 @pytest.mark.asyncio
-async def test_read_single_vendor_contact_not_found(client: TestClient):
+async def test_read_single_vendor_contact_not_found(client: AsyncClient):
     """
     존재하지 않는 ID의 공급업체 담당자 조회 시 404 Not Found를 반환하는지 테스트합니다.
     """
@@ -931,7 +933,7 @@ async def test_read_single_vendor_contact_not_found(client: TestClient):
 
 @pytest.mark.asyncio
 async def test_update_vendor_contact_success_admin(
-    admin_client: TestClient, db_session: Session
+    admin_client: AsyncClient, db_session: Session
 ):
     """
     관리자 권한으로 공급업체 담당자 정보를 성공적으로 업데이트하는지 테스트합니다.
@@ -966,7 +968,7 @@ async def test_update_vendor_contact_success_admin(
 
 @pytest.mark.asyncio
 async def test_update_vendor_contact_unauthorized(
-    authorized_client: TestClient, client: TestClient, db_session: Session
+    authorized_client: AsyncClient, client: AsyncClient, db_session: Session
 ):
     """
     일반 사용자 및 비인증 사용자가 공급업체 담당자 업데이트 시도 시 403 Forbidden 또는 401 Unauthorized를 반환하는지 테스트합니다.
@@ -1004,7 +1006,7 @@ async def test_update_vendor_contact_unauthorized(
 
 @pytest.mark.asyncio
 async def test_delete_vendor_contact_success_admin(
-    admin_client: TestClient, db_session: Session
+    admin_client: AsyncClient, db_session: Session
 ):
     """
     관리자 권한으로 공급업체 담당자를 성공적으로 삭제하는지 테스트합니다.
@@ -1035,7 +1037,7 @@ async def test_delete_vendor_contact_success_admin(
 
 @pytest.mark.asyncio
 async def test_delete_vendor_contact_unauthorized(
-    authorized_client: TestClient, client: TestClient, db_session: Session
+    authorized_client: AsyncClient, client: AsyncClient, db_session: Session
 ):
     """
     일반 사용자 및 비인증 사용자가 공급업체 담당자 삭제 시도 시 403 Forbidden 또는 401 Unauthorized를 반환하는지 테스트합니다.

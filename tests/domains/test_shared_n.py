@@ -8,14 +8,16 @@
 - 역할 기반 접근 제어(RBAC)를 포함한 다양한 사용자 역할에 따른
   인증 및 권한 부여 로직을 검증합니다.
 """
+import pytest
+import pytest_asyncio  # @pytest.mark.asyncio 데코레이터 및 비동기 픽스처 사용 시 필요
 import tempfile  # tempfile.TemporaryDirectory() 픽스처 사용 시 필요
 from pathlib import Path
 from datetime import datetime, UTC
 
-import pytest
-import pytest_asyncio  # @pytest.mark.asyncio 데코레이터 및 비동기 픽스처 사용 시 필요
+from httpx import AsyncClient
+
 from sqlmodel.ext.asyncio.session import AsyncSession
-from fastapi.testclient import TestClient
+# from fastapi.testclient import TestClient
 
 from app.core.config import settings
 from app.domains.usr import models as usr_models
@@ -50,7 +52,7 @@ async def test_resource_category(db_session: AsyncSession) -> shared_models.Reso
 
 
 @pytest.mark.asyncio
-async def test_create_version_success_admin(admin_client: TestClient):
+async def test_create_version_success_admin(admin_client: AsyncClient):
     """관리자 권한으로 새로운 애플리케이션 버전을 성공적으로 생성하는지 테스트합니다."""
     version_data = {"version": "1.0.0", "publish_date": "2025-05-01", "notes": "초기 릴리즈"}
     response = await admin_client.post("/api/v1/shared/versions", json=version_data)
@@ -60,7 +62,7 @@ async def test_create_version_success_admin(admin_client: TestClient):
 
 
 @pytest.mark.asyncio
-async def test_create_version_unauthorized(authorized_client: TestClient, client: TestClient):
+async def test_create_version_unauthorized(authorized_client: AsyncClient, client: AsyncClient):
     """일반/비인증 사용자가 버전 생성을 시도할 때 권한 오류가 발생하는지 테스트합니다."""
     version_data = {"version": "1.0.1-unauth", "publish_date": "2025-05-02"}
     response_user = await authorized_client.post("/api/v1/shared/versions", json=version_data)
@@ -73,7 +75,7 @@ async def test_create_version_unauthorized(authorized_client: TestClient, client
 
 @pytest.mark.asyncio
 async def test_delete_resource_category_restrict_by_resource(
-    admin_client: TestClient, db_session: AsyncSession, test_user: usr_models.User
+    admin_client: AsyncClient, db_session: AsyncSession, test_user: usr_models.User
 ):
     """사용 중인 리소스 유형 삭제 시도 시 400 Bad Request를 반환하는지 테스트합니다."""
     test_resource_category = shared_models.ResourceCategory(name="사용중인 리소스 유형")
@@ -102,7 +104,7 @@ async def test_delete_resource_category_restrict_by_resource(
 
 # --- 리소스 파일 및 권한 관리 엔드포인트 테스트 ---
 @pytest.mark.asyncio
-async def test_upload_resource_success(authorized_client: TestClient, test_resource_category: shared_models.ResourceCategory):
+async def test_upload_resource_success(authorized_client: AsyncClient, test_resource_category: shared_models.ResourceCategory):
     """
     사용자가 리소스(이미지)를 성공적으로 업로드하는지 테스트합니다.
     """
@@ -129,7 +131,7 @@ async def test_upload_resource_success(authorized_client: TestClient, test_resou
 
 @pytest.mark.asyncio
 async def test_resource_permissions_as_admin(
-    admin_client: TestClient,
+    admin_client: AsyncClient,
     db_session: AsyncSession,
     get_password_hash_fixture,
     test_resource_category: shared_models.ResourceCategory
@@ -170,7 +172,7 @@ async def test_resource_permissions_as_admin(
 
 @pytest.mark.asyncio
 async def test_resource_permissions_as_owner(
-    authorized_client: TestClient,
+    authorized_client: AsyncClient,
     test_user: usr_models.User,
     db_session: AsyncSession,
     test_resource_category: shared_models.ResourceCategory
@@ -197,7 +199,7 @@ async def test_resource_permissions_as_owner(
 
 @pytest.mark.asyncio
 async def test_resource_permissions_as_facility_manager(
-    facility_manager_client: TestClient,
+    facility_manager_client: AsyncClient,
     db_session: AsyncSession,
     test_user: usr_models.User,
     test_resource_category: shared_models.ResourceCategory,
@@ -239,8 +241,8 @@ async def test_resource_permissions_as_facility_manager(
 
 @pytest.mark.asyncio
 async def test_image_permissions_as_unauthorized_role(
-    authorized_client: TestClient,
-    facility_manager_client: TestClient,  # [추가] 설비 관리자 클라이언트 주입
+    authorized_client: AsyncClient,
+    facility_manager_client: AsyncClient,  # [추가] 설비 관리자 클라이언트 주입
     db_session: AsyncSession,
     get_password_hash_fixture,
     test_user: usr_models.User,
@@ -360,7 +362,7 @@ async def setup_for_entity_resource_test(
 
 
 @pytest.mark.asyncio
-async def test_entity_resource_link_and_read(authorized_client: TestClient, setup_for_entity_resource_test):
+async def test_entity_resource_link_and_read(authorized_client: AsyncClient, setup_for_entity_resource_test):
     """[수정] 엔티티에 리소스를 연결하고, 해당 엔티티로 리소스를 조회하는 것을 테스트합니다."""
     resource1, resource2, equipment = setup_for_entity_resource_test
 
@@ -382,7 +384,7 @@ async def test_entity_resource_link_and_read(authorized_client: TestClient, setu
 
 
 @pytest.mark.asyncio
-async def test_create_entity_resource_with_nonexistent_resource(authorized_client: TestClient, setup_for_entity_resource_test):
+async def test_create_entity_resource_with_nonexistent_resource(authorized_client: AsyncClient, setup_for_entity_resource_test):
     """[수정] 존재하지 않는 리소스 ID로 엔티티-리소스 연결 시 404를 반환하는지 테스트합니다."""
     _, _, equipment = setup_for_entity_resource_test
     link_data = {"resource_id": 99999, "entity_type": "EQUIPMENT", "entity_id": equipment.id}
@@ -392,7 +394,7 @@ async def test_create_entity_resource_with_nonexistent_resource(authorized_clien
 
 
 @pytest.mark.asyncio
-async def test_set_main_resource_and_delete_link(admin_client: TestClient, db_session: AsyncSession, setup_for_entity_resource_test):
+async def test_set_main_resource_and_delete_link(admin_client: AsyncClient, db_session: AsyncSession, setup_for_entity_resource_test):
     """[수정] 대표 리소스를 설정하고, 연결을 해제하는 것을 테스트합니다."""
     resource1, resource2, equipment = setup_for_entity_resource_test
 
@@ -426,8 +428,8 @@ async def test_set_main_resource_and_delete_link(admin_client: TestClient, db_se
 # 리소스 및 엔티티-리소스 관련 API 테스트
 # =============================================================================
 async def test_read_entity_resources_for_entity_with_resource_details(
-    admin_client: TestClient,
-    authorized_client: TestClient,
+    admin_client: AsyncClient,
+    authorized_client: AsyncClient,
     db_session: AsyncSession,
     test_user: usr_models.User,
     test_resource_category: shared_models.ResourceCategory,  # [수정] 픽스처 사용

@@ -3,11 +3,12 @@
 'rpt' (보고서) 도메인 관련 API 엔드포인트에 대한 통합 테스트 모듈입니다.
 보고서 양식의 CRUD, 권한, 유효성 검사 등을 테스트합니다.
 """
+from io import BytesIO
 import pytest
 import pytest_asyncio  # @pytest.mark.asyncio 데코레이터 및 비동기 픽스처 사용 시 필요
 from httpx import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
-from io import BytesIO
+
 
 from app.domains.shared import models as shared_models
 
@@ -28,7 +29,8 @@ async def test_resource_category_for_rpt(db_session: AsyncSession) -> shared_mod
 
 @pytest.fixture(scope="function")
 async def test_report_template_file(
-    admin_client: AsyncClient,
+    # admin_client: AsyncClient, # <-- admin_client 대신 authorized_client 사용
+    authorized_client: AsyncClient, # [수정] 일반 사용자 클라이언트를 사용합니다.
     test_resource_category_for_rpt: shared_models.ResourceCategory
 ) -> int:
     """
@@ -43,7 +45,7 @@ async def test_report_template_file(
         )
     }
     data = {"category_id": test_resource_category_for_rpt.id, "description": "테스트 업로드"}
-    upload_response = await admin_client.post(UPLOAD_API_PREFIX, files=files, data=data)
+    upload_response = await authorized_client.post(UPLOAD_API_PREFIX, files=files, data=data)
     assert upload_response.status_code == 201
     return upload_response.json()["id"]
 
@@ -154,12 +156,16 @@ async def test_list_report_forms(admin_client: AsyncClient, test_report_template
 
 @pytest.mark.asyncio
 async def test_create_report_form_permission_denied(
-    authorized_client: AsyncClient, test_report_template_file: int
+    authorized_client: AsyncClient,  test_report_template_file: int,
+    client: AsyncClient,  # 비인증 클라이언트
 ):
     """
     [실패/권한] 일반 사용자가 보고서 양식 생성을 시도할 때 403 Forbidden 오류를 받는지 테스트합니다.
     """
     #  Given: 일반 사용자로 생성할 데이터를 준비합니다.
+    """
+    [성공] 관리자가 파일로 보고서 양식을 생성하고 조회하는 전체 과정을 테스트합니다.
+    """
     form_data = {"name": "권한 없는 생성 시도", "template_file_id": test_report_template_file}
 
     #  When & Then: 생성 요청 시 403 오류가 발생해야 합니다.

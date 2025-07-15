@@ -16,8 +16,6 @@ from sqlalchemy.pool import NullPool
 from sqlalchemy import text
 from sqlmodel import SQLModel  # , Session
 
-from fastapi.testclient import TestClient as SyncTestClient  # 추가: 동기 TestClient도 필요할 수 있으므로
-
 # app.main을 임포트하여 FastAPI 앱 인스턴스에 접근합니다.
 from app.main import app as main_app
 from app.core import dependencies as deps
@@ -96,21 +94,28 @@ async def db_session() -> AsyncGenerator[AsyncSession, None]:
     각 테스트 함수마다 트랜잭션을 시작하고, 테스트 완료 후 롤백하여
     테스트 간의 격리를 보장하는 비동기 데이터베이스 세션을 제공합니다.
     """
-    # async with test_engine.begin() as connection:
-    #     async with TestingSessionLocal(bind=connection) as session:
-    #         yield session
-    #         await connection.rollback()
+    # 권장되는 비동기 트랜잭션 관리 패턴을 사용합니다.
+    async with test_engine.begin() as connection:  # connection 내에서 트랜잭션 시작
+        async with TestingSessionLocal(bind=connection) as session:  # 세션 생성 및 바인딩
+            yield session
+            # `async with` 블록을 벗어날 때 SQLAlchemy가 자동으로 트랜잭션을 관리합니다.
+            # 테스트가 실패하면 pytest_asyncio가 예외를 전파하고,
+            # connection.begin() 컨텍스트가 해당 트랜잭션을 롤백합니다.
+            # 명시적인 rollback 호출은 필요하지 않거나,
+            # connection.rollback()은 트랜잭션이 이미 종료된 경우 경고를 발생시킬 수 있습니다.
+            # 테스트 격리를 위해 yield 이후 connection을 롤백하는 것이 일반적입니다.
+            await connection.rollback()  # 트랜잭션을 명시적으로 롤백하여 테스트 격리 보장
 
-    connection = await test_engine.connect()
-    transaction = await connection.begin()
-    session = TestingSessionLocal(bind=connection)
+    # connection = await test_engine.connect()
+    # transaction = await connection.begin()
+    # session = TestingSessionLocal(bind=connection)
 
-    try:
-        yield session
-    finally:
-        await session.close()
-        await transaction.rollback()
-        await connection.close()
+    # try:
+    #     yield session
+    # finally:
+    #     await session.close()
+    #     await transaction.rollback()
+    #     await connection.close()
 
 
 @pytest_asyncio.fixture(scope="session")
@@ -318,29 +323,28 @@ def authorized_client_factory(
     #             main_app.dependency_overrides = original_overrides
 
     # return _create_client_generator
-    @asynccontextmanager  # <-- asynccontextmanager 데코레이터 추가
+    @asynccontextmanager
     async def _create_client_context(user: usr_models.User, password: str) -> AsyncGenerator[AsyncClient, None]:
-        # 개별 요청에 대한 세션 및 현재 사용자 오버라이드 함수
         def override_get_session():
             yield db_session
 
         def override_get_current_user():
             return user
 
-        # 테스트 시작 전 원래 의존성 상태를 저장합니다.
-        # 이 시점에서는 main_app.dependency_overrides가 전역 상태이므로,
-        # 각 테스트 함수마다 새로운 클라이언트를 만들 때 이를 재설정해야 합니다.
-        original_overrides = main_app.dependency_overrides.copy()
+        # 이 블록 내에서만 오버라이드를 적용하기 위해 contextlib.asynccontextmanager를 사용합니다.
+        # FastAPI의 app.dependency_overrides는 dict이므로, TestClient를 사용하지 않는 경우
+        # 이처럼 수동으로 context manager를 구현해야 합니다.
+        original_get_session_dep = main_app.dependency_overrides.get(get_session)
+        original_deps_get_db_session = main_app.dependency_overrides.get(deps.get_db_session)
+        original_deps_get_current_active_user = main_app.dependency_overrides.get(deps.get_current_active_user)
+        original_deps_get_current_admin_user = main_app.dependency_overrides.get(deps.get_current_admin_user)
 
         try:
-            # 모든 클라이언트에 공통적인 의존성 오버라이드
-            main_app.dependency_overrides.update({
-                get_session: override_get_session,
-                deps.get_db_session: override_get_session,
-                deps.get_current_active_user: override_get_current_user,
-            })
+            main_app.dependency_overrides[get_session] = override_get_session
+            main_app.dependency_overrides[deps.get_db_session] = override_get_session
+            main_app.dependency_overrides[deps.get_current_active_user] = override_get_current_user
 
-            # 관리자 역할(ADMIN)일 경우에만 추가로 관리자 의존성을 오버라이드
+            # 관리자 역할일 경우에만 get_current_admin_user 오버라이드
             if user.role == usr_models.UserRole.ADMIN:
                 main_app.dependency_overrides[deps.get_current_admin_user] = override_get_current_user
 
@@ -354,16 +358,30 @@ def authorized_client_factory(
 
                 token = res.json()["access_token"]
                 client.headers["Authorization"] = f"Bearer {token}"
-                print(f"DEBUG IN FACTORY: Client for user '{user.user_id}' created with token starting: {token[:10]}...")
-                print(f"DEBUG IN FACTORY: Client Authorization header: {client.headers.get('Authorization')}")
-                yield client  # <-- 클라이언트를 반환합니다.
+                yield client
 
         finally:
-            # 테스트가 끝난 후 원래 의존성 상태로 되돌립니다.
-            main_app.dependency_overrides.clear()
-            main_app.dependency_overrides.update(original_overrides)
+            # 오버라이드된 의존성을 원래대로 복원합니다.
+            if original_get_session_dep is not None:
+                main_app.dependency_overrides[get_session] = original_get_session_dep
+            elif get_session in main_app.dependency_overrides:
+                del main_app.dependency_overrides[get_session]
 
-    # 이제 팩토리는 클라이언트 제너레이터 대신 비동기 컨텍스트 매니저를 반환합니다.
+            if original_deps_get_db_session is not None:
+                main_app.dependency_overrides[deps.get_db_session] = original_deps_get_db_session
+            elif deps.get_db_session in main_app.dependency_overrides:
+                del main_app.dependency_overrides[deps.get_db_session]
+
+            if original_deps_get_current_active_user is not None:
+                main_app.dependency_overrides[deps.get_current_active_user] = original_deps_get_current_active_user
+            elif deps.get_current_active_user in main_app.dependency_overrides:
+                del main_app.dependency_overrides[deps.get_current_active_user]
+
+            if original_deps_get_current_admin_user is not None:
+                main_app.dependency_overrides[deps.get_current_admin_user] = original_deps_get_current_admin_user
+            elif deps.get_current_admin_user in main_app.dependency_overrides:
+                del main_app.dependency_overrides[deps.get_current_admin_user]
+
     return _create_client_context
 
 
