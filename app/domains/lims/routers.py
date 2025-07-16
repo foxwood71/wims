@@ -79,25 +79,26 @@ async def update_parameter(
     return await lims_crud.parameter.update(db=db, db_obj=db_obj, obj_in=parameter_in)
 
 
-@router.delete("/parameters/{parameter_id}", status_code=status.HTTP_204_NO_CONTENT, summary="분석 항목 삭제")
+@router.delete(
+    "/parameters/{parameter_id}",
+    status_code=status.HTTP_200_OK,
+    summary="분석 항목 비활성화 (Soft Delete)"
+)
 async def delete_parameter(
     parameter_id: int,
     db: AsyncSession = Depends(deps.get_db_session),
     current_admin_user: usr_models.User = Depends(deps.get_current_admin_user),
 ):
-    # """ID를 기준으로 분석 항목을 삭제합니다. 관리자 권한이 필요합니다."""
-    # db_obj = await lims_crud.parameter.get(db=db, id=parameter_id)
-    # if not db_obj:
-    #     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Parameter not found")
-    # await lims_crud.parameter.delete(db=db, id=parameter_id)
-    # return
     """ID를 기준으로 분석 항목을 비활성화(Soft Delete)합니다."""
     db_obj = await lims_crud.parameter.get(db=db, id=parameter_id)
     if not db_obj:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Parameter not found")
 
+    # is_active 상태를 업데이트하기 위한 스키마 객체 생성
+    update_data = lims_schemas.ParameterUpdate(is_active=False)
+
     # 물리적 삭제 대신 is_active 플래그를 업데이트합니다.
-    return await lims_crud.parameter.update(db=db, db_obj=db_obj, obj_in={"is_active": False})
+    return await lims_crud.parameter.update(db=db, db_obj=db_obj, obj_in=update_data)
 
 
 # =============================================================================

@@ -11,14 +11,14 @@ from typing import List, Optional, Dict, Any
 from datetime import date, datetime, time, UTC  # UTC 임포트 추가
 from pydantic import BaseModel, Field as PydanticField  # Pydantic Field와 SQLModel Field 충돌 방지
 
-from sqlmodel import SQLModel  # SQLModel 클래스 임포트 (BaseModel 기능 포함)
+# from sqlmodel import SQLModel  # SQLModel 클래스 임포트 (BaseModel 기능 포함)
 
 
 # =============================================================================
 # 1. 분석 항목 (Parameter) 스키마
 # =============================================================================
 class ParameterBase(BaseModel):
-    code: str = PydanticField(max_length=4, description="분석 항목 코드")
+    code: str = PydanticField(max_length=5, description="분석 항목 코드")
     analysis_group: Optional[str] = PydanticField(default=None, max_length=50, description="동일 분석 항목 그룹")
     name: str = PydanticField(max_length=255, description="분석 항목명")
     units: Optional[str] = PydanticField(default=None, max_length=255, description="측정 단위")
@@ -33,6 +33,7 @@ class ParameterBase(BaseModel):
     price: Optional[float] = PydanticField(default=None, description="분석 비용")
     description: Optional[str] = PydanticField(default=None, description="설명")
     sort_order: int = PydanticField(description="정렬 순서")  # 생성 시 필수
+    is_active: bool = PydanticField(default=True, description="활성 여부")
 
 
 class ParameterCreate(ParameterBase):
@@ -55,6 +56,7 @@ class ParameterUpdate(BaseModel):  # 업데이트는 모두 Optional
     price: Optional[float] = PydanticField(None, description="분석 비용")
     description: Optional[str] = PydanticField(None, description="설명")
     sort_order: Optional[int] = PydanticField(None, description="정렬 순서")
+    is_active: Optional[bool] = PydanticField(None, description="활성 여부")
 
 
 class ParameterResponse(ParameterBase):

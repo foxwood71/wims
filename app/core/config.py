@@ -1,6 +1,6 @@
 # app/core/config.py
 
-from typing import Optional, Any
+from typing import Any
 from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 import os
@@ -33,7 +33,7 @@ class Settings(BaseSettings):
     DEBUG_MODE: bool = Field(False, description="Enable debug mode for detailed logging and error messages")
 
     # --- 데이터베이스 설정 ---
-    DATABASE_URL: SecretStr = Field(..., description="PostgreSQL database connection URL (e.g., postgresql+asyncpg://user:pass@host:port/db)")
+    DATABASE_URL: SecretStr = Field(..., description="PostgreSQL database connection URL")
 
     # --- JWT (JSON Web Token) 설정 ---
     SECRET_KEY: SecretStr = Field(..., description="Secret key for JWT token signing. Keep this highly secure!")
@@ -42,12 +42,7 @@ class Settings(BaseSettings):
 
     # --- 파일 업로드 설정 ---
     # UPLOAD_DIR: 개발 환경과 프로덕션 환경에 따라 다르게 설정
-    # 개발 환경 (로컬 WSL2에서 직접 실행 시): 프로젝트 루트 내의 'data/uploads' 또는 /tmp/uploads
-    # 프로덕션/Docker 환경: 컨테이너 내부 경로 '/app/data/uploads'
-    UPLOAD_DIR: str = Field(
-        "/shared/data/uploads",  # 기본값은 Docker 환경용
-        description="Directory for uploaded files."
-    )
+    UPLOAD_DIR: str = Field(..., description="Directory for uploaded files.")
 
     # Post-initialization validation (Pydantic v2 BaseSettings)
     def model_post_init(self, __context: Any) -> None:  # noqa: ANN001
@@ -59,15 +54,3 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
-
-# 이 부분은 `model_post_init` 메서드로 대체되거나,
-# 애플리케이션의 `main.py`에서 `lifespan` 이벤트에 추가하는 것이 더 적절합니다.
-# 하지만 현재 `routers.py`에서 `UPLOAD_DIRECTORY`가 모듈 로딩 시점에 초기화되므로
-# `model_post_init`에서 변경하는 것이 가장 직접적인 해결책입니다.
-# 로깅을 활성화하여 실제 경로가 어떻게 설정되는지 확인하세요.
-# if settings.DEBUG_MODE:
-#    print(f"\n--- Application Settings Loaded (Debug Mode) ---")
-#    print(f"APP_ENV: {settings.APP_ENV}")
-#    print(f"DATABASE_URL: {settings.DATABASE_URL.secret_partial}")
-#    print(f"UPLOAD_DIR: {settings.UPLOAD_DIR}")
-#    print(f"--------------------------------------------------\n")

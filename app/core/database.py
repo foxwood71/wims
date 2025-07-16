@@ -25,7 +25,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession  # AsyncSession은 비동�
 from app.core.config import settings
 
 # =============================================================================
-# 모든 도메인 모델 임포트 -> 순환 import 때문에 main.py로 이동
+# 모든 도메인 모델 임포트 -> 순환 import 때문에 main.py에서 이동
 # =============================================================================
 # 이 부분이 매우 중요합니다. 모든 SQLModel 클래스가 SQLModel.metadata에 등록되도록
 # 명시적으로 임포트해야 합니다. 이렇게 해야 SQLAlchemy 매퍼가 모든 모델과
@@ -69,6 +69,9 @@ metadata = SQLModel.metadata
 # 매퍼 구성 완료 플래그 (중복 호출 방지)
 _mappers_configured = False
 
+# 프로젝트에서 사용하는 모든 스키마를 정의
+SCHEMA = ['shared', 'usr', 'loc', 'ven', 'fms', 'inv', 'lims', 'ops', 'corp', 'rpt']
+
 
 # =============================================================================
 # 데이터베이스 초기화 및 테이블 생성 함수
@@ -79,36 +82,26 @@ async def create_db_and_tables() -> None:
     이 함수는 개발 환경에서만 사용해야 하며, 기존 테이블을 삭제하지는 않습니다.
     """
     global _mappers_configured  # 전역 플래그를 사용합니다.
-    print("DEBUG: 데이터베이스 초기화 함수 시작.")
 
     # 스키마 생성
-    print("DEBUG: 데이터베이스 스키마 생성을 시도합니다...")
     async with engine.begin() as conn:
-        # 'app' 스키마를 'shared' 스키마로 변경
-        schemas_to_create = ['shared', 'usr', 'loc', 'ven', 'fms', 'inv', 'lims', 'ops', 'corp', 'rpt']  # 'app' 대신 'shared'
-        for schema_name in schemas_to_create:
+
+        for schema_name in SCHEMA:
             await conn.execute(text(f"CREATE SCHEMA IF NOT EXISTS {schema_name}"))
-            print(f"  DEBUG: 스키마 '{schema_name}' 생성 완료 또는 이미 존재.")
 
         # SQLAlchemy 매퍼 초기화: 모든 모델 클래스가 로드된 후 호출해야 합니다.
         # 이 호출은 애플리케이션 수명 주기에서 단 한 번만 필요합니다.
         # 하지만 pytest 환경에서는 각 테스트 세션 또는 모듈 로딩 시마다 호출될 수 있습니다.
         if not _mappers_configured:
-            print("DEBUG: SQLAlchemy 매퍼 초기화를 시도합니다 (최초 1회)...")
             try:
                 configure_mappers()
                 _mappers_configured = True
-                print("DEBUG: SQLAlchemy 매퍼 초기화 완료.")
-            except Exception as e:
+            except Exception as e:  #
                 # 매퍼가 이미 초기화되었거나 다른 초기화 오류가 발생할 수 있습니다.
                 # 이는 경고로 처리하고 계속 진행합니다.
-                print(f"WARNING: SQLAlchemy 매퍼 초기화 중 오류 발생 (무시될 수 있음): {e}")
-
-        # 모든 SQLModel 클래스가 SQLModel.metadata에 등록되어 있어야 합니다.
-        print("DEBUG: 데이터베이스 테이블 생성을 시도합니다...")
-        await conn.run_sync(SQLModel.metadata.create_all)
-    print("DEBUG: 데이터베이스 테이블 생성이 완료되었습니다 (또는 이미 존재).")
-    print("DEBUG: 데이터베이스 초기화 함수 종료.")
+                print(f"DEBUG - database.py - create_db_and_tables: {e}")
+                # 모든 SQLModel 클래스가 SQLModel.metadata에 등록되어 있어야 합니다.
+                await conn.run_sync(SQLModel.metadata.create_all)
 
 
 # =============================================================================

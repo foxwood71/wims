@@ -14,6 +14,7 @@ class CompanyInfo(SQLModel, table=True):
     이 테이블은 항상 단 하나의 행만 유지합니다.
     """
     __tablename__ = "company_info"  # 테이블명 지정
+    __table_args__ = {'schema': 'corp'}
 
     id: int = Field(default=1, primary_key=True, description="고유 ID (항상 1)")
     name: str = Field(index=True, max_length=100, description="회사명")

@@ -20,14 +20,14 @@ if TYPE_CHECKING:
     from app.domains.loc.models import Facility, Location
     from app.domains.usr.models import Department, User
     # ops.models에서 DailyPlantOperation, Line, OpsView, DailyLineOperation 모델 임포트 추가
-    from app.domains.ops.models import DailyPlantOperation, Line, OpsView, DailyLineOperation  #
+    # from app.domains.ops.models import DailyPlantOperation, Line, OpsView, DailyLineOperation
 
 
 # =============================================================================
 # 1. lims.parameters 테이블 모델
 # =============================================================================
 class ParameterBase(SQLModel):
-    code: str = Field(max_length=4, unique=True, description="분석 항목 코드")
+    code: str = Field(max_length=5, unique=True, description="분석 항목 코드")
     analysis_group: Optional[str] = Field(default=None, max_length=50, description="동일 분석 항목 그룹")
     name: str = Field(max_length=255, description="분석 항목명")
     units: Optional[str] = Field(default=None, max_length=255, description="측정 단위")

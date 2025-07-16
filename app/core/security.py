@@ -36,7 +36,6 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     """
     일반 텍스트 비밀번호와 해싱된 비밀번호를 비교하여 일치하는지 확인합니다.
     """
-    print(f"DEBUG: Verifying password for hashed: {hashed_password[:10]}...")
     return pwd_context.verify(plain_password, hashed_password)
 
 
@@ -44,7 +43,6 @@ def get_password_hash(password: str) -> str:
     """
     주어진 비밀번호를 해싱합니다.
     """
-    print("DEBUG: Hashing password.")
     return pwd_context.hash(password)
 
 
@@ -67,7 +65,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
         expire = datetime.now(timezone.utc) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY.get_secret_value(), algorithm=settings.ALGORITHM)
-    print(f"DEBUG: Access token created, expires at: {expire}")
+
     return encoded_jwt
 
 
@@ -87,7 +85,7 @@ def create_refresh_token(data: dict, expires_delta: Optional[timedelta] = None) 
     # refresh_token에는 고유한 식별자를 포함할 수 있습니다 (예: jti)
     # to_encode.update({"jti": str(uuid.uuid4())})
     encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY.get_secret_value(), algorithm=settings.ALGORITHM)
-    print(f"DEBUG: Refresh token created, expires at: {expire}")
+
     return encoded_jwt
 
 
@@ -110,7 +108,7 @@ async def get_current_user_from_token(
             raise credentials_exception
         token_data = user_id
     except JWTError as e:
-        print(f"DEBUG: JWTError: {e}")
+        print(f"DEBUG - security.py - get_current_user_from_token JWTError: {e}")
         raise credentials_exception
 
     # 데이터베이스에서 사용자 조회
@@ -119,7 +117,6 @@ async def get_current_user_from_token(
     user = result.scalars().one_or_none()
     if user is None:
         raise credentials_exception
-    print(f"DEBUG: Current user: {user.user_id} (ID: {user.id})")
     return user
 
 
@@ -144,10 +141,6 @@ def get_current_admin_user(
     현재 인증된 관리자 사용자를 반환합니다 (role <= 10).
     관리자 권한이 없는 경우 403 Forbidden을 발생시킵니다.
     """
-    print(f"DEBUG: security.py - get_current_admin_user called for user_id: {current_user.user_id}")
-    print(f"DEBUG: security.py - current_user.role: {current_user.role} (value: {current_user.role.value})")
-    print(f"DEBUG: security.py - usr_models.UserRole.ADMIN: {usr_models.UserRole.ADMIN} (value: {usr_models.UserRole.ADMIN.value})")
-
     # allowed_roles = [usr_models.UserRole.ADMIN, usr_models.UserRole.LAB_MANAGER,
     #                 usr_models.UserRole.FACILITY_MANAGER, usr_models.UserRole.INVENTORY_MANAGER]
 
@@ -156,12 +149,10 @@ def get_current_admin_user(
     if not current_user.is_active:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Inactive user")
     if current_user.role not in allowed_roles:
-        print(f"DEBUG: Role '{current_user.role.name}' is NOT in allowed roles. Raising 403.")
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not enough permissions. Admin role required."
         )
-    print(f"DEBUG: security.py - Role '{current_user.role.name}' IS in allowed roles. Proceeding.")
     return current_user
 
 

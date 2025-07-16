@@ -39,11 +39,10 @@ logger.error(f"IntegrityError during wastewater plant deletion: {e}") # e 변수
 
 # 데이터 베이스 마이그레이션
 
-- 초기화
-  migrations 디렉토리에서, alembic init versions 명령실행
-  @ 비동기 처리를 위해 migrations/versions/env.py를 migrations/env.py로 대체
-  . init: 새 프로젝트를 시작할 때 딱 한 번만 쓰는 환경 생성 명령어입니다. (현재 폴더를 중심으로 만듬.)
-  . revision: 이미 만들어진 환경 안에서 새로운 마이그레이션 파일을 만드는 명령어입니다.
+migrations 디렉토리에서, alembic init versions 명령실행
+@ 비동기 처리를 위해 migrations/versions/env.py를 migrations/env.py로 대체
+. init: 새 프로젝트를 시작할 때 딱 한 번만 쓰는 환경 생성 명령어입니다. (현재 폴더를 중심으로 만듬.)
+. revision: 이미 만들어진 환경 안에서 새로운 마이그레이션 파일을 만드는 명령어입니다.
 
 # 비어있는 폴더 생성
 
@@ -65,10 +64,26 @@ touch migrations/versions/**init**.py
 
 - "설계도"(마이그레이션 스크립트)를 보고 실제 데이터베이스에 변경사항을 적용
   alembic upgrade head
-  ```head`는 가장 최신 버전의 마이그레이션을 의미합니다. 이 명령어를 실행하면 데이터베이스에 접속하여 마이그레이션 스크립트에 정의된 `CREATE TABLE` 등의 SQL 구문이 실행됩니다.
+  `head`는 가장 최신 버전의 마이그레이션을 의미합니다. 이 명령어를 실행하면 데이터베이스에 접속하여 마이그레이션 스크립트에 정의된 `CREATE TABLE` 등의 SQL 구문이 실행됩니다.
 
 - 갱신 시
   alembic revision --autogenerate -m "Add ON DELETE RESTRICT to fms.equipments.current_location_id"
+
+# alembic 완전 초기화
+
+1. 모든 파이썬 캐시를 삭제합니다.
+   $ ./clean_pycache.sh
+2. migrations/versions 폴더를 깨끗하게 초기화합니다.
+   $ ./clean_alembic.sh
+3. 데이터베이스 버전 기록 삭제
+   PSQL wims_dbv1=# DROP TABLE IF EXISTS public.alembic_version;
+4. 현재 모델 기준으로 DB 상태 재설정
+   $ alembic stamp head
+5. 첫 마이그레이션 스크립트 생성
+   $ alembic revision --autogenerate -m "Create initial tables"
+   $ alembic revision --autogenerate -m "Initial migration from current models"
+6. 마이그레이션 스크립트 실행
+   $ alembic upgrade head
 
 # services 디렉토리 (서비스 계층):
 
@@ -139,10 +154,15 @@ equipment_spec_definitions에 정의된 속성이 변경(추가, 또는 삭제, 
 
 # 테스트 오류
 
-FAILED tests/domains/test_shared_n.py::test_upload_image_success - assert 500 == 201
-FAILED tests/domains/test_shared_n.py::test_image_permissions_as_admin - sqlalchemy.exc.IntegrityError: (sqlalchemy.dialects.postgresql.asyncpg.IntegrityError) <class 'asyncpg.exceptions.NotNullViolationError'>: "user_id" 칼럼(해당 릴레이션 "users")의 null 값이 not null 제약조건을 위반했습니다.
-FAILED tests/domains/test_shared_n.py::test_image_permissions_as_owner - assert 403 == 200
-FAILED tests/domains/test_shared_n.py::test_read_entity_images_for_entity_with_image_details - pydantic_core.\_pydantic_core.ValidationError: 1 validation error for ImageCreate
+ERROR tests/domains/test_lims_n.py::test_read_aliquot_samples_with_filter
+ERROR tests/domains/test_lims_n.py::test_create_analysis_result_success_user
+ERROR tests/domains/test_lims_n.py::test_create_analysis_result_duplicate_error
+ERROR tests/domains/test_lims_n.py::TestWorksheetAndItems::test_create_worksheet_item_success
+ERROR tests/domains/test_lims_n.py::TestWorksheetAndItems::test_soft_delete_worksheet_item
+
+FAILED tests/domains/test_lims_n.py::test_create_sample_success
+FAILED tests/domains/test_lims_n.py::test_create_aliquot_sample_success
+FAILED tests/domains/test_lims_n.py::test_update_aliquot_sample_status_triggers_parent_update
 
 # ======================================================================================================
 

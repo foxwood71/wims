@@ -26,5 +26,5 @@ Alembic이 해당 디렉토리 내의 모듈들을 올바르게 로드할 수 �
 # 패키지 메타데이터 (선택 사항, Alembic 빌드 시스템에서 직접 사용될 일은 거의 없습니다.)
 __title__ = "Alembic Migrations"
 __description__ = "Database migration scripts managed by Alembic."
-__version__ = "0.1.0" # 마이그레이션 스크립트 패키지의 내부 버전
-__all__ = [] # 이 패키지에서 'from migrations import *' 시 내보낼 이름 목록.
+__version__ = "0.1.0"  # 마이그레이션 스크립트 패키지의 내부 버전
+__all__ = []  # 이 패키지에서 'from migrations import *' 시 내보낼 이름 목록.

@@ -70,14 +70,14 @@ async def test_lims_project_fixture(db_session: AsyncSession) -> lims_models.Pro
 async def test_test_request_fixture(
     db_session: AsyncSession,
     test_lims_project: lims_models.Project,
-    test_department: usr_models.Department,
+    test_department_a: usr_models.Department,
     test_user: usr_models.User,
 ) -> lims_models.TestRequest:
     """테스트용 시험 의뢰(TestRequest)를 생성하고 반환합니다."""
     test_req = lims_models.TestRequest(
         request_date=date.today(),
         project_id=test_lims_project.id,
-        department_id=test_department.id,
+        department_id=test_department_a.id,
         requester_user_id=test_user.id,
         title="일반 테스트 의뢰",
         requested_parameters={"pH": True, "BOD": True},
@@ -188,7 +188,7 @@ async def test_instrument_fixture(
 async def test_aliquot_sample_fixture(
     db_session: AsyncSession,
     test_lims_project: lims_models.Project,
-    test_department: usr_models.Department,
+    test_department_a: usr_models.Department,
     test_sampler_user: usr_models.User,
     test_sampling_point: lims_models.SamplingPoint,
     test_sample_container: lims_models.SampleContainer,
@@ -200,7 +200,7 @@ async def test_aliquot_sample_fixture(
     test_req = lims_models.TestRequest(
         request_date=date.today(),
         project_id=test_lims_project.id,
-        department_id=test_department.id,
+        department_id=test_department_a.id,
         requester_user_id=test_sampler_user.id,
         title="Test request for aliquot",
         requested_parameters={},
@@ -568,9 +568,9 @@ async def test_read_parameters_by_analysis_group(
     print("\n--- Running test_read_parameters_by_analysis_group ---")
 
     # 테스트 데이터 생성
-    param1_data = {"code": "BOD", "name": "생물학적 산소 요구량", "sort_order": 1, "analysis_group": "BOD_GROUP"}
-    param2_data = {"code": "BOD5_2", "name": "5일 생물학적 산소 요구량", "sort_order": 2, "analysis_group": "BOD_GROUP"}  # 중복 코드 방지
-    param3_data = {"code": "COD_2", "name": "화학적 산소 요구량", "sort_order": 3, "analysis_group": "COD_GROUP"}  # 중복 코드 방지
+    param1_data = {"code": "BOD00", "name": "생물학적 산소 요구량", "sort_order": 1, "analysis_group": "BOD_GROUP"}
+    param2_data = {"code": "BOD05", "name": "5일 생물학적 산소 요구량", "sort_order": 2, "analysis_group": "BOD_GROUP"}  # 중복 코드 방지
+    param3_data = {"code": "COD02", "name": "화학적 산소 요구량", "sort_order": 3, "analysis_group": "COD_GROUP"}  # 중복 코드 방지
 
     await admin_client.post("/api/v1/lims/parameters", json=param1_data)
     await admin_client.post("/api/v1/lims/parameters", json=param2_data)
@@ -584,9 +584,9 @@ async def test_read_parameters_by_analysis_group(
     assert len(result_data) >= 2  # 다른 테스트와 격리되지 않으므로, 최소 2개 이상
 
     result_codes = {item['code'] for item in result_data}
-    assert "BOD" in result_codes
-    assert "BOD5_2" in result_codes
-    assert "COD_2" not in result_codes  # 다른 그룹의 항목은 포함되지 않아야 함
+    assert "BOD00" in result_codes
+    assert "BOD05" in result_codes
+    assert "COD02" not in result_codes  # 다른 그룹의 항목은 포함되지 않아야 함
 
 
 @pytest.mark.asyncio
@@ -679,7 +679,7 @@ async def test_delete_project_and_cascade_to_test_request(
     admin_client: AsyncClient,
     db_session: AsyncSession,
     test_lims_project: lims_models.Project,
-    test_department: usr_models.Department,
+    test_department_a: usr_models.Department,
     test_user: usr_models.User
 ):
     """
@@ -689,7 +689,7 @@ async def test_delete_project_and_cascade_to_test_request(
     req_to_delete = await lims_crud.test_request.create(db_session, obj_in=lims_schemas.TestRequestCreate(
         request_date=date.today(),
         project_id=test_lims_project.id,
-        department_id=test_department.id,
+        department_id=test_department_a.id,
         requester_user_id=test_user.id,
         title="삭제될 프로젝트의 의뢰",
         requested_parameters={}
@@ -784,12 +784,34 @@ async def test_read_sampling_points_with_filter(
 # =============================================================================
 # 4. 시험 의뢰 (TestRequest) 테스트
 # =============================================================================
+@pytest_asyncio.fixture(name="test_parameter_condition_model")
+async def test_parameter_model_fixture(db_session: AsyncSession) -> lims_models.SampleContainer:
+    """
+    사용자 권한 테스트에서 사용할 시료 용기(SampleContainer)를
+    모델을 통해 직접 DB에 생성하고 반환합니다.
+    """
+    #  LIMS 도메인의 모델을 사용하여 객체 생성
+    parameter = lims_models.Parameter(
+        code="BOD5",
+        name="BOD 5일",
+        sort_order=1
+    )
+
+    #  데이터베이스 세션을 통해 객체 추가 및 저장
+    db_session.add(parameter)
+    await db_session.commit()
+    await db_session.refresh(parameter)
+
+    return parameter
+
+
 @pytest.mark.asyncio
 async def test_create_test_request_with_auto_user_id(
     authorized_client: AsyncClient,
     test_lims_project: lims_models.Project,
-    test_department: usr_models.Department,
-    test_user: usr_models.User
+    test_department_a: usr_models.Department,
+    test_user: usr_models.User,
+    test_parameter_condition_model: lims_models.Parameter  # prarameter (분석항목 생성)
 ):
     """
     [성공/로직] requester_user_id 없이 시험 의뢰 생성 시, 현재 로그인된 사용자로 자동 할당되는지 테스트합니다.
@@ -798,7 +820,7 @@ async def test_create_test_request_with_auto_user_id(
     request_data = {
         "request_date": str(date.today()),
         "project_id": test_lims_project.id,
-        "department_id": test_department.id,
+        "department_id": test_department_a.id,
         "title": "사용자 ID 자동 할당 테스트",
         "requested_parameters": {"BOD5": True}
     }
@@ -813,7 +835,7 @@ async def test_create_test_request_with_auto_user_id(
 async def test_create_test_request_with_invalid_parameter_code(
     authorized_client: AsyncClient,
     test_lims_project: lims_models.Project,
-    test_department: usr_models.Department
+    test_department_a: usr_models.Department
 ):
     """
     [실패/유효성/신규] 등록되지 않은 파라미터 코드로 시험 의뢰 생성 시 400 에러를 받는지 테스트합니다.
@@ -822,7 +844,7 @@ async def test_create_test_request_with_invalid_parameter_code(
     request_data = {
         "request_date": str(date.today()),
         "project_id": test_lims_project.id,
-        "department_id": test_department.id,
+        "department_id": test_department_a.id,
         "title": "잘못된 파라미터 코드 테스트",
         "requested_parameters": {"INVALID_CODE": True}
     }
@@ -838,7 +860,7 @@ async def test_read_own_test_requests_as_user(
     test_user: usr_models.User,
     test_admin_user: usr_models.User,
     test_lims_project: lims_models.Project,
-    test_department: usr_models.Department,
+    test_department_a: usr_models.Department,
 ):
     """
     [성공/권한] 일반 사용자가 자신의 시험 의뢰 목록만 조회할 수 있는지 테스트합니다.
@@ -848,7 +870,7 @@ async def test_read_own_test_requests_as_user(
     await lims_crud.test_request.create(db_session, obj_in=lims_schemas.TestRequestCreate(
         request_date=date.today(),
         project_id=test_lims_project.id,
-        department_id=test_department.id,
+        department_id=test_department_a.id,
         title="내 의뢰",
         requested_parameters={}
     ), current_user_id=test_user.id)
@@ -856,7 +878,7 @@ async def test_read_own_test_requests_as_user(
     await lims_crud.test_request.create(db_session, obj_in=lims_schemas.TestRequestCreate(
         request_date=date.today(),
         project_id=test_lims_project.id,
-        department_id=test_department.id,
+        department_id=test_department_a.id,
         title="다른 사람 의뢰",
         requested_parameters={}
     ), current_user_id=test_admin_user.id)
@@ -875,7 +897,7 @@ async def test_read_other_user_test_request_forbidden(
     db_session: AsyncSession,
     test_admin_user: usr_models.User,
     test_lims_project: lims_models.Project,
-    test_department: usr_models.Department
+    test_department_a: usr_models.Department
 ):
     """
     [실패/권한] 일반 사용자가 다른 사용자의 시험 의뢰를 ID로 직접 조회 시 403 Forbidden을 받는지 테스트합니다.
@@ -886,7 +908,7 @@ async def test_read_other_user_test_request_forbidden(
     other_user_request = await lims_crud.test_request.create(db_session, obj_in=lims_schemas.TestRequestCreate(
         request_date=date.today(),
         project_id=test_lims_project.id,
-        department_id=test_department.id,
+        department_id=test_department_a.id,
         title="다른 사람 의뢰",
         requested_parameters={}
     ), current_user_id=test_admin_user.id)
@@ -1175,67 +1197,169 @@ async def test_create_analysis_result_duplicate_error(
 # =============================================================================
 # 8. 기타 엔티티 CRUD 기본 테스트
 # =============================================================================
+@pytest_asyncio.fixture(name="test_sample_container_model")
+async def test_sample_container_model_fixture(db_session: AsyncSession) -> lims_models.SampleContainer:
+    """
+    사용자 권한 테스트에서 사용할 시료 용기(SampleContainer)를
+    모델을 통해 직접 DB에 생성하고 반환합니다.
+    """
+    #  LIMS 도메인의 모델을 사용하여 객체 생성
+    container = lims_models.SampleContainer(code=101, name="1L PE Bottle for User Test")
+
+    #  데이터베이스 세션을 통해 객체 추가 및 저장
+    db_session.add(container)
+    await db_session.commit()
+    await db_session.refresh(container)
+
+    return container
+
 
 @pytest.mark.asyncio
-async def test_crud_sample_container(admin_client: AsyncClient, authorized_client: AsyncClient):
+async def test_crud_sample_container_as_admin(admin_client: AsyncClient):
     """
-    [성공/실패] 시료 용기(SampleContainer)의 기본적인 CRUD 및 권한을 테스트합니다.
+    [성공] 관리자 권한으로 시료 용기(SampleContainer)의 CRUD를 테스트합니다.
     """
-    print("\n--- Running test_crud_sample_container ---")
-    #  1. Admin으로 생성 (성공)
-    container_data = {"code": 101, "name": "1L PE Bottle"}
+    print("\n--- Running test_crud_sample_container_as_admin ---")
+
+    # 1. 관리자로 생성 (성공)
+    container_data = {"code": 201, "name": "Admin Test Bottle"}
     response = await admin_client.post("/api/v1/lims/sample_containers", json=container_data)
     assert response.status_code == 201
     created_container = response.json()
     container_id = created_container["id"]
+    assert created_container["name"] == container_data["name"]
 
-    #  2. 일반 유저로 생성 (실패)
-    response = await authorized_client.post("/api/v1/lims/sample_containers", json={"code": 102, "name": "실패 용기"})
-    assert response.status_code == 403
-
-    #  3. 모든 사용자가 조회 (성공)
-    response = await authorized_client.get(f"/api/v1/lims/sample_containers/{container_id}")
+    # 2. 관리자로 특정 데이터 조회 (성공)
+    response = await admin_client.get(f"/api/v1/lims/sample_containers/{container_id}")
     assert response.status_code == 200
     assert response.json()["name"] == container_data["name"]
 
-    #  4. Admin으로 삭제 (성공)
+    # 3. 관리자로 데이터 수정 (성공)
+    update_data = {"name": "Admin Test Bottle (Updated)"}
+    response = await admin_client.put(f"/api/v1/lims/sample_containers/{container_id}", json=update_data)
+    assert response.status_code == 200
+    assert response.json()["name"] == update_data["name"]
+
+    # 4. 관리자로 삭제 (성공)
     response = await admin_client.delete(f"/api/v1/lims/sample_containers/{container_id}")
     assert response.status_code == 204
 
-    #  5. 삭제 확인 (실패 - 404)
+    # 5. 삭제 확인 (실패 - 404)
     response = await admin_client.get(f"/api/v1/lims/sample_containers/{container_id}")
+    assert response.status_code == 404
     assert response.status_code == 404
 
 
 @pytest.mark.asyncio
-async def test_crud_weather_condition(admin_client: AsyncClient, authorized_client: AsyncClient):
+async def test_crud_sample_container_as_user(
+    authorized_client: AsyncClient,
+    test_sample_container_model: lims_models.SampleContainer  # Fixture를 통해 DB에 등록된 모델 객체를 주입받음
+):
     """
-    [성공/실패/신규] 날씨(WeatherCondition)의 기본적인 CRUD 및 권한을 테스트합니다.
+    [실패/성공] 일반 사용자 권한으로 시료 용기(SampleContainer) CRUD를 테스트합니다.
+    - 생성/삭제는 실패하고, 조회는 성공해야 합니다.
+    """
+    print("\n--- Running test_permissions_sample_container_as_user ---")
+    container_id = test_sample_container_model.id
+
+    # 1. 일반 사용자로 Fixture가 등록한 데이터 조회 (성공 - 200 OK)
+    response = await authorized_client.get(f"/api/v1/lims/sample_containers/{container_id}")
+    assert response.status_code == 200
+    assert response.json()["name"] == test_sample_container_model.name
+
+    # 2. 일반 사용자로 생성 시도 (실패 - 403 Forbidden)
+    response = await authorized_client.post("/api/v1/lims/sample_containers", json={"code": 202, "name": "User Fail Bottle"})
+    assert response.status_code == 403
+
+    # 3. 일반 사용자로 수정 시도 (실패 - 403 Forbidden)
+    response = await authorized_client.put(f"/api/v1/lims/sample_containers/{container_id}", json={"name": "User Update Fail"})
+    assert response.status_code == 403
+
+    # 4. 일반 사용자로 삭제 시도 (실패 - 403 Forbidden)
+    response = await authorized_client.delete(f"/api/v1/lims/sample_containers/{container_id}")
+    assert response.status_code == 403
+
+
+@pytest_asyncio.fixture(name="test_weather_condition_model")
+async def test_weather_condition_model_fixture(db_session: AsyncSession) -> lims_models.SampleContainer:
+    """
+    사용자 권한 테스트에서 사용할 시료 용기(SampleContainer)를
+    모델을 통해 직접 DB에 생성하고 반환합니다.
+    """
+    #  LIMS 도메인의 모델을 사용하여 객체 생성
+    container = lims_models.WeatherCondition(code=10, status="폭설")
+
+    #  데이터베이스 세션을 통해 객체 추가 및 저장
+    db_session.add(container)
+    await db_session.commit()
+    await db_session.refresh(container)
+
+    return container
+
+
+@pytest.mark.asyncio
+async def test_crud_weather_condition_as_admin(
+    admin_client: AsyncClient,
+):
+    """
+    [성공] 관리자 권한으로 날씨(WeatherCondition)의 CRUD 및 권한을 테스트합니다.
     """
     print("\n--- Running test_crud_weather_condition ---")
-    #  1. Admin으로 생성 (성공)
+
+    # 1. 관리자로 생성 (성공)
     data = {"code": 10, "status": "폭설"}
     response = await admin_client.post("/api/v1/lims/weather_conditions", json=data)
     assert response.status_code == 201
     created_obj = response.json()
     obj_id = created_obj["id"]
 
-    #  2. 일반 유저로 생성 (실패)
-    response = await authorized_client.post("/api/v1/lims/weather_conditions", json={"code": 11, "status": "태풍"})
-    assert response.status_code == 403
-
-    #  3. 모든 사용자가 조회 (성공)
-    response = await authorized_client.get(f"/api/v1/lims/weather_conditions/{obj_id}")
+    # 2. 관리자로 특정 데이터 조회 (성공)
+    response = await admin_client.get(f"/api/v1/lims/weather_conditions/{obj_id}")
     assert response.status_code == 200
     assert response.json()["status"] == data["status"]
 
-    #  4. Admin으로 삭제 (성공)
+    # 3. 관리자로 특정 데이터 수정 (성공)
+    update_data = {"status": "강우"}
+    response = await admin_client.put(f"/api/v1/lims/weather_conditions/{obj_id}", json=update_data)
+    assert response.status_code == 200
+    assert response.json()["status"] == update_data["status"]
+
+    # 4. 관리자로 삭제 (성공)
     response = await admin_client.delete(f"/api/v1/lims/weather_conditions/{obj_id}")
     assert response.status_code == 204
 
-    #  5. 삭제 확인 (실패 - 404)
+    # 5. 삭제 확인 (실패 - 404)
     response = await admin_client.get(f"/api/v1/lims/weather_conditions/{obj_id}")
     assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_crud_weather_condition_as_user(
+    authorized_client: AsyncClient,
+    test_weather_condition_model: lims_models.WeatherCondition  # Fixture를 통해 DB에 등록된 모델 객체를 주입받음
+):
+    """
+    [성공]  날씨(WeatherCondition)의 CRUD 및 권한을 테스트합니다.
+    """
+    print("\n--- Running test_crud_weather_condition ---")
+    weather_id = test_weather_condition_model.id
+
+    # 1. 일반 사용자로 Fixture가 등록한 데이터 조회 (성공 - 200 OK)
+    response = await authorized_client.get(f"/api/v1/lims/weather_conditions/{weather_id}")
+    assert response.status_code == 200
+    assert response.json()["status"] == test_weather_condition_model.status
+
+    # 2. 일반 유저로 생성 (실패)
+    response = await authorized_client.post("/api/v1/lims/weather_conditions", json={"code": 11, "status": "태풍"})
+    assert response.status_code == 403
+
+    # 3. 일반 사용자로 수정 시도 (실패 - 403 Forbidden)
+    response = await authorized_client.put("/api/v1/lims/weather_conditions/{weather_id}", json={"status": "맑음"})
+    assert response.status_code == 403
+
+    # 4. 삭제 확인 (실패 - 404)
+    response = await authorized_client.get(f"/api/v1/lims/weather_conditions/{weather_id}")
+    assert response.status_code == 200
 
 
 # =============================================================================

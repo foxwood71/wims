@@ -16,6 +16,10 @@ from sqlalchemy.pool import NullPool
 from sqlalchemy import text
 from sqlmodel import SQLModel  # , Session
 
+# pgsql_scripts 패키지에서 __init__.py를 통해
+# sqlmodel에서 관리하고 있는 않는 DB 객체(views, function, trigger) import
+from pgsql_scripts import all_db_objects
+
 # app.main을 임포트하여 FastAPI 앱 인스턴스에 접근합니다.
 from app.main import app as main_app
 from app.core import dependencies as deps
@@ -28,7 +32,9 @@ from app.core.security import get_password_hash
 #  설명: SQLModel.metadata.create_all()이 모든 테이블을 인식하려면,
 #  아래처럼 모든 모델 클래스가 한 번 이상 임포트되어야 합니다.
 #  app/domains/models/__init__.py에서 모든 모델 클래스 임포트
-from app.domains.models import *    # noqa: F401, F403 (와일드카드 임포트는 LIMS 모델이 많아 편의상 사용)
+# from app.domains.models import *    # noqa: F401, F403 (와일드카드 임포트는 LIMS 모델이 많아 편의상 사용)
+from app.domains.fms import models  # noqa: F401
+
 
 # --- 사용자 모델 임포트 ---
 from app.domains.usr import models as usr_models
@@ -67,23 +73,46 @@ SCHEMA = ["shared", "usr", "loc", "ven", "fms", "inv", "lims", "ops", "corp", "r
 @pytest_asyncio.fixture(scope="session", autouse=True)
 async def setup_database():
     """
-    테스트 세션 시작 시 모든 테이블을 삭제하고 재생성합니다.
-    테스트 종료 시 다시 테이블을 삭제합니다.
+    [통합 Fixture] 테스트 세션 시작 시 다음 순서로 DB를 완벽하게 설정합니다.
+    1. 모든 테이블 삭제
+    2. 모든 스키마 생성
+    3. 모든 테이블 생성
+    4. 공유 DB 객체(함수, 트리거 등) 적용
     """
     print("\nDEBUG: Setting up database for session...")
+
+    # 트랜잭션을 사용하여 전체 DB 설정을 하나의 작업 단위로 묶습니다.
     async with test_engine.begin() as conn:
-        # 모든 도메인의 스키마 이름을 명시적으로 생성합니다.
-        # init.sql의 스키마 생성 순서를 고려하여 일관성을 유지합니다.
+        # --- 1. 테이블 전체 삭제 ---
+        # DROP SCHEMA ... CASCADE는 의존성에 상관없이 모든 것을 삭제
+        print("--- Dropping all tables... ---")
+        for schema_name in SCHEMA:
+            # 존재하지 않는 스키마를 삭제하려 할 때 오류가 나지 않도록 IF EXISTS 사용
+            await conn.execute(f"DROP SCHEMA IF EXISTS {schema_name} CASCADE")
+
+        # --- 2. 스키마 생성 ---
+        print("--- Creating schemas... ---")
         for schema_name in SCHEMA:
             await conn.execute(text(f"CREATE SCHEMA IF NOT EXISTS {schema_name}"))
 
-        # 모든 SQLModel.metadata에 등록된 테이블을 drop_all 및 create_all 합니다.
-        # 모든 모델 파일이 상단에 임포트되어 있어야 SQLModel.metadata가 모든 테이블을 인식합니다.
-        await conn.run_sync(SQLModel.metadata.drop_all)
+        # --- 3. 테이블 전체 생성 ---
+        print("--- Creating all tables... ---")
         await conn.run_sync(SQLModel.metadata.create_all)
 
-    yield  # 테스트 실행
+        # --- 4. 공유 DB 객체(함수, 트리거 등) 적용 ---
+        print("--- Applying shared DB objects (Functions, Triggers, etc.)... ---")
+        for db_object in all_db_objects:
+            sql_statement_generator = db_object.to_sql_statement_create_or_replace()
+            for statement in sql_statement_generator:
+                await conn.execute(statement)  # 여기도 conn을 사용
 
+    print("--- Database setup complete. Running tests... ---")
+
+    # 모든 준비가 끝난 후, 테스트를 실행합니다.
+    yield
+
+    # --- 테스트 세션 종료 후 정리 ---
+    print("\n--- Tearing down database for session... ---")
     async with test_engine.begin() as conn:
         await conn.run_sync(SQLModel.metadata.drop_all)
 
