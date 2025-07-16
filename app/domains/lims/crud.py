@@ -325,7 +325,6 @@ class CRUDTestRequest(CRUDBase[lims_models.TestRequest, lims_schemas.TestRequest
         시험 의뢰를 생성합니다. 이 과정에서 다음을 수행합니다:
         - `request_date`가 없으면 오늘 날짜로 설정합니다.
         - `requester_user_id`가 없으면 현재 사용자로 설정합니다.
-        - 요청된 분석 항목(`requested_parameters`)이 시스템에 등록된 항목인지 검증합니다.
         - 관련된 외래 키(FK)들이 유효한지 확인합니다.
         """
         # 1. request_date 기본값 설정 (사용자 제안)

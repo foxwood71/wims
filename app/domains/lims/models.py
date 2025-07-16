@@ -198,7 +198,7 @@ class WeatherCondition(SQLModel, table=True):
         description="레코드 마지막 업데이트 일시"
     )
     test_requests: List["TestRequest"] = Relationship(back_populates="sampling_weather")
-    samples: List["Sample"] = Relationship(back_populates="sampling_weather")
+    # samples: List["Sample"] = Relationship(back_populates="sampling_weather")
 
 
 # =============================================================================
@@ -223,7 +223,7 @@ class TestRequest(SQLModel, table=True):
     sampler: Optional[str] = Field(default=None, max_length=32)
     water_temp: Optional[float] = Field(default=None, sa_column=Column(REAL))
     air_temp: Optional[float] = Field(default=None, sa_column=Column(REAL))
-    requested_parameters: Dict[str, Any] = Field(sa_column=Column(JSONB))
+    # requested_parameters: Dict[str, Any] = Field(sa_column=Column(JSONB)) -> sample에 이동 개별 sample마다 분석 파라메터가 틀리수 있기에
     submitted_at: Optional[datetime] = Field(
         default_factory=lambda: datetime.now(UTC),
         sa_column=Column(TIMESTAMP(timezone=True), server_default=func.now()),
@@ -244,7 +244,7 @@ class TestRequest(SQLModel, table=True):
     project: "Project" = Relationship(back_populates="test_requests")
     department: "Department" = Relationship(back_populates="test_requests")
     requester_user: "User" = Relationship(back_populates="test_requests_created")
-    sampling_weather: Optional["WeatherCondition"] = Relationship(back_populates="test_requests")
+    # sampling_weather: Optional["WeatherCondition"] = Relationship(back_populates="test_requests")
     samples: List["Sample"] = Relationship(
         back_populates="request", sa_relationship_kwargs={'cascade': 'all, delete-orphan'}
     )
@@ -263,7 +263,7 @@ class Sample(SQLModel, table=True):
     sampling_point_id: int = Field(foreign_key="lims.sampling_points.id")
     sampling_date: date
     sampling_time: Optional[time] = Field(default=None)
-    sampling_weather_id: Optional[int] = Field(default=None, foreign_key="lims.weather_conditions.id")
+    # sampling_weather_id: Optional[int] = Field(default=None, foreign_key="lims.weather_conditions.id") 의뢰서와 중복으로 삭제..
     sampler: Optional[str] = Field(default=None, max_length=32)
     sample_temp: Optional[float] = Field(default=None, sa_column=Column(REAL))
     sample_type_id: int = Field(foreign_key="lims.sample_types.id")

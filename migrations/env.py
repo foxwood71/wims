@@ -8,7 +8,7 @@ from logging.config import fileConfig
 from alembic import context
 from alembic_utils.replaceable_entity import register_entities
 
-from sqlalchemy import pool, text
+from sqlalchemy import pool, text, inspect
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 from sqlmodel import SQLModel
 
@@ -52,7 +52,9 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 # ⭐️ Alembic-utils에 우리가 정의한 모든 함수/트리거 객체를 등록합니다.
-register_entities(all_db_objects)
+# 처음 - 코멘트 후 실행 : 테이블 우선생성
+# 2회차 이후 - 코멘트 제거 실행
+# register_entities(all_db_objects)
 
 # target_metadata는 autogenerate 지원을 위해 SQLModel의 메타데이터를 사용합니다.
 # Alembic-utils는 alembic.ini의 'user_module_prefix' 설정을 통해
@@ -76,6 +78,16 @@ def do_run_migrations(connection) -> None:
     실제 마이그레이션을 실행하는 동기 로직입니다.
     Alembic 컨텍스트를 데이터베이스 연결로 구성하고 마이그레이션을 실행합니다.
     """
+    # alembic_version 테이블이 이미 존재할 때만 (즉, 초기화 이후)
+    # 함수/트리거를 autogenerate 대상에 포함시킴
+    # 데이터베이스 Inspector를 사용하여 alembic_version 테이블 존재 여부 확인
+    # inspector = inspect(connection)
+    # has_alembic_version_table = inspector.has_table("alembic_version", schema="public")
+
+    # if has_alembic_version_table:
+    #     print("--- DB is already initialized. Registering functions/triggers for comparison. ---")
+    #     register_entities(all_db_objects)
+
     context.configure(
         connection=connection,
         target_metadata=target_metadata,

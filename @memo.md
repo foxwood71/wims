@@ -80,8 +80,18 @@ touch migrations/versions/**init**.py
 4. 현재 모델 기준으로 DB 상태 재설정
    $ alembic stamp head
 5. 첫 마이그레이션 스크립트 생성
-   $ alembic revision --autogenerate -m "Create initial tables"
-   $ alembic revision --autogenerate -m "Initial migration from current models"
+
+   - env.py
+   - 1회차 - # register_entities(all_db_objects) <-코멘트 후 실행 : 테이블 우선생성
+
+     $ alembic revision --autogenerate -m "Create initial tables"
+     $ alembic upgrade head
+
+   - env.py
+   - 2회차 이후 - register_entities(all_db_objects) <- 코멘트 제거 실행 : 스크립트 생성
+     $ alembic revision --autogenerate -m "Initial migration from current models"
+     $ alembic upgrade head
+
 6. 마이그레이션 스크립트 실행
    $ alembic upgrade head
 

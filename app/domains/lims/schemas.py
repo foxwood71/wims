@@ -237,7 +237,7 @@ class TestRequestBase(BaseModel):
     sampler: Optional[str] = PydanticField(default=None, max_length=32, description="채수자")
     water_temp: Optional[float] = PydanticField(default=None, description="수온")
     air_temp: Optional[float] = PydanticField(default=None, description="기온")
-    requested_parameters: Dict[str, Any] = PydanticField(description="요청된 분석 항목 (JSONB)")
+    # requested_parameters: Dict[str, Any] = PydanticField(description="요청된 분석 항목 (JSONB)")  [삭제] smaple과 중복
 
 
 class TestRequestCreate(TestRequestBase):
@@ -265,13 +265,13 @@ class TestRequestUpdate(BaseModel):  # 업데이트는 모두 Optional
     sampler: Optional[str] = PydanticField(None, max_length=32, description="채수자")
     water_temp: Optional[float] = PydanticField(None, description="수온")
     air_temp: Optional[float] = PydanticField(None, description="기온")
-    requested_parameters: Optional[Dict[str, Any]] = PydanticField(None, description="요청된 분석 항목 (JSONB)")
+    # requested_parameters: Optional[Dict[str, Any]] = PydanticField(None, description="요청된 분석 항목 (JSONB)")  [삭제] smaple과 중복
 
 
 class TestRequestResponse(TestRequestBase):
     id: int = PydanticField(description="시험 의뢰 고유 ID")
-    # request_code는 DB에서 생성되지만, 응답에서는 Optional로 처리하여 None을 허용합니다.
-    request_code: Optional[str] = PydanticField(max_length=20, description="시험 의뢰 코드")
+    # request_code는 DB에서 생성되어 응답에서는 필수 필드임.
+    request_code: str = PydanticField(max_length=20, description="시험 의뢰 코드")
     submitted_at: datetime = PydanticField(description="제출 일시")
     created_at: datetime = PydanticField(description="레코드 생성 일시")
     updated_at: datetime = PydanticField(description="레코드 마지막 업데이트 일시")
@@ -290,7 +290,7 @@ class SampleBase(BaseModel):
     sampling_point_id: int = PydanticField(description="채수 지점 ID (FK)")
     sampling_date: date = PydanticField(description="채수일자")
     sampling_time: Optional[time] = PydanticField(default=None, description="채수시각")
-    sampling_weather_id: Optional[int] = PydanticField(default=None, description="채수 시 날씨 조건 ID (FK)")
+    # sampling_weather_id: Optional[int] = PydanticField(default=None, description="채수 시 날씨 조건 ID (FK)")  [삭제] test_request와 중복
     sampler: Optional[str] = PydanticField(default=None, max_length=32, description="채수자")
     sample_temp: Optional[float] = PydanticField(default=None, description="시료 온도")
     sample_type_id: int = PydanticField(description="시료 유형 ID (FK)")
@@ -324,7 +324,7 @@ class SampleUpdate(BaseModel):  # 업데이트는 모두 Optional
     sampling_point_id: Optional[int] = PydanticField(None, description="채수 지점 ID (FK)")
     sampling_date: Optional[date] = PydanticField(None, description="채수일자")
     sampling_time: Optional[time] = PydanticField(None, description="채수시각")
-    sampling_weather_id: Optional[int] = PydanticField(None, description="채수 시 날씨 조건 ID (FK)")
+    # sampling_weather_id: Optional[int] = PydanticField(default=None, description="채수 시 날씨 조건 ID (FK)")  [삭제] test_request와 중복
     sampler: Optional[str] = PydanticField(None, max_length=32, description="채수자")
     sample_temp: Optional[float] = PydanticField(None, description="시료 온도")
     sample_type_id: Optional[int] = PydanticField(None, description="시료 유형 ID (FK)")
@@ -347,8 +347,8 @@ class SampleUpdate(BaseModel):  # 업데이트는 모두 Optional
 
 class SampleResponse(SampleBase):
     id: int = PydanticField(description="시료 고유 ID")
-    # sample_code는 DB에서 생성되지만, 응답에서는 Optional로 처리하여 None을 허용합니다.
-    sample_code: Optional[str] = PydanticField(max_length=24, description="시료 코드")
+    # sample_code는 DB에서 생성되어 필수
+    sample_code: str = PydanticField(max_length=24, description="시료 코드")
     created_at: datetime = PydanticField(description="레코드 생성 일시")
     updated_at: datetime = PydanticField(description="레코드 마지막 업데이트 일시")
 
