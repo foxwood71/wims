@@ -187,7 +187,7 @@ class OpsViewBase(SQLModel):
     `ops.views` 테이블과 매핑됩니다.
     """
     name: str = Field(..., max_length=255, description="운영 데이터 보기 이름")
-    user_id: int = Field(..., description="운영 데이터 보기 사용자 ID (FK)")
+    login_id: int = Field(..., description="운영 데이터 보기 사용자 ID (FK)")
     facility_id: int = Field(..., description="단일 필터용 처리시설 ID (FK)")  # <--- 이 라인 추가
     facility_ids: Optional[List[int]] = Field(None, description="운영 데이터 보기 처리시설 ID 목록 (JSONB 배열)")
     line_ids: Optional[List[int]] = Field(None, description="운영 데이터 보기 라인 ID 목록 (JSONB 배열)")
@@ -198,7 +198,7 @@ class OpsViewBase(SQLModel):
 class OpsViewCreate(OpsViewBase):
     """
     새로운 사용자 정의 운영 데이터 보기 설정을 생성하기 위한 Pydantic 모델입니다.
-    `name`, `user_id`는 필수 필드입니다.
+    `name`, `login_id`는 필수 필드입니다.
     """
     pass
 
@@ -209,7 +209,7 @@ class OpsViewUpdate(OpsViewBase):
     모든 필드는 선택 사항입니다 (부분 업데이트 가능).
     """
     name: Optional[str] = Field(None, max_length=255, description="운영 데이터 보기 이름")
-    user_id: Optional[int] = Field(None, description="운영 데이터 보기 사용자 ID (FK)") # <-- 이 라인 추가
+    login_id: Optional[int] = Field(None, description="운영 데이터 보기 사용자 ID (FK)") # <-- 이 라인 추가
     facility_id: Optional[int] = Field(None, description="단일 필터용 처리시설 ID (FK)") # <-- 이 라인 추가
     facility_ids: Optional[List[int]] = Field(None, description="운영 데이터 보기 처리시설 ID 목록")
     memo: Optional[str] = Field(None, description="메모") # memo도 Optional로 해주는 것이 좋습니다.

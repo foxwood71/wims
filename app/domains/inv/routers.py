@@ -351,8 +351,8 @@ async def create_material_transaction(
     - USAGE: FIFO 로직에 따라 재고를 차감하며, 여러 개의 거래 이력이 생성될 수 있습니다.
     - PURCHASE: 새로운 배치를 생성하고 재고를 추가합니다.
     """
-    if transaction_create.performed_by_user_id is None:
-        transaction_create.performed_by_user_id = current_user.id
+    if transaction_create.performed_by_login_id is None:
+        transaction_create.performed_by_login_id = current_user.id
 
     transactions = await inv_crud.material_transaction.create(
         db=db, obj_in=transaction_create

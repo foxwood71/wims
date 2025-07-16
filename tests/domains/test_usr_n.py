@@ -302,7 +302,7 @@ async def test_delete_department_with_associated_users(
     await db_session.refresh(dept_with_users)
 
     user_in_dept = usr_models.User(
-        user_id="userindept",
+        login_id="userindept",
         email="userindept@example.com",
         password_hash=get_password_hash_fixture("password"),
         department_id=dept_with_users.id,
@@ -327,7 +327,7 @@ async def test_create_user_success_admin(admin_client: AsyncClient):
     관리자 권한으로 새로운 사용자를 성공적으로 생성하는지 테스트합니다.
     """
     user_data = {
-        "user_id": "newbie",
+        "login_id": "newbie",
         "password": "new_password_123",
         "email": "newbie@example.com",
         "name": "신입사원",
@@ -336,20 +336,20 @@ async def test_create_user_success_admin(admin_client: AsyncClient):
     response = await admin_client.post("/api/v1/usr/users", json=user_data)
     assert response.status_code == status.HTTP_201_CREATED
     created_user = response.json()
-    assert created_user["user_id"] == user_data["user_id"]
+    assert created_user["login_id"] == user_data["login_id"]
     assert "password_hash" not in created_user  # 응답에 비밀번호 해시가 없는지 확인
 
 
 @pytest.mark.asyncio
-async def test_create_user_duplicate_user_id_fail(
+async def test_create_user_duplicate_login_id_fail(
     admin_client: AsyncClient,
     test_user: usr_models.User
 ):
     """
-    중복된 user_id로 사용자 생성 시 400 에러를 반환하는지 테스트합니다.
+    중복된 login_id로 사용자 생성 시 400 에러를 반환하는지 테스트합니다.
     """
     user_data = {
-        "user_id": test_user.user_id,  # 기존 사용자와 동일한 ID
+        "login_id": test_user.login_id,  # 기존 사용자와 동일한 ID
         "password": "another_password",
         "email": "another@example.com",
         "role": usr_models.UserRole.GENERAL_USER,
@@ -368,7 +368,7 @@ async def test_create_user_duplicate_email_admin(
     관리자 권한으로 사용자 생성 시, 중복 이메일로 400 에러를 반환하는지 테스트합니다.
     """
     user_data = {
-        "user_id": "anotherusername",
+        "login_id": "anotherusername",
         "password": "newpassword",
         "email": test_user.email,  # 기존 사용자와 동일한 ID
         "role": usr_models.UserRole.GENERAL_USER
@@ -387,7 +387,7 @@ async def test_create_user_unauthorized(
     권한 없는 사용자의 사용자 생성 시도를 테스트합니다. (일반 사용자, 비인증 사용자)
     """
     user_data = {
-        "user_id": "unauthuser",
+        "login_id": "unauthuser",
         "password": "password123",
         "email": "unauth@example.com",
         "role": usr_models.UserRole.GENERAL_USER
@@ -412,8 +412,8 @@ async def test_read_users_success_admin(
     assert response.status_code == 200
     users_list = response.json()
     assert len(users_list) >= 2
-    assert any(u["user_id"] == test_user.user_id for u in users_list)
-    assert any(u["user_id"] == test_admin_user.user_id for u in users_list)
+    assert any(u["login_id"] == test_user.login_id for u in users_list)
+    assert any(u["login_id"] == test_admin_user.login_id for u in users_list)
 
 
 @pytest.mark.asyncio
@@ -442,7 +442,7 @@ async def test_read_user_by_id_success_admin(
     """
     response_other = await admin_client.get(f"/api/v1/usr/users/{test_user.id}")
     assert response_other.status_code == 200
-    assert response_other.json()["user_id"] == test_user.user_id
+    assert response_other.json()["login_id"] == test_user.login_id
 
 
 @pytest.mark.asyncio
@@ -455,7 +455,7 @@ async def test_read_user_by_id_success_user_self(
     """
     response = await authorized_client.get(f"/api/v1/usr/users/{test_user.id}")
     assert response.status_code == 200
-    assert response.json()["user_id"] == test_user.user_id
+    assert response.json()["login_id"] == test_user.login_id
 
 
 @pytest.mark.asyncio

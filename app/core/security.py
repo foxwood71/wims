@@ -103,16 +103,16 @@ async def get_current_user_from_token(
     )
     try:
         payload = jwt.decode(token, settings.SECRET_KEY.get_secret_value(), algorithms=[settings.ALGORITHM])
-        user_id: str = payload.get("sub")
-        if user_id is None:
+        login_id: str = payload.get("sub")
+        if login_id is None:
             raise credentials_exception
-        token_data = user_id
+        token_data = login_id
     except JWTError as e:
         print(f"DEBUG - security.py - get_current_user_from_token JWTError: {e}")
         raise credentials_exception
 
     # 데이터베이스에서 사용자 조회
-    statement = select(usr_models.User).where(usr_models.User.user_id == token_data)
+    statement = select(usr_models.User).where(usr_models.User.login_id == token_data)
     result = await db.execute(statement)
     user = result.scalars().one_or_none()
     if user is None:

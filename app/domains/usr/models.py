@@ -95,7 +95,7 @@ class UserBase(SQLModel):
     usr.users 테이블의 기본 속성을 정의하는 SQLModel Base 클래스입니다.
     """
     id: Optional[int] = Field(default=None, primary_key=True, description="사용자 고유 ID")
-    user_id: str = Field(max_length=50, sa_column_kwargs={"unique": True}, description="로그인 사용자명")
+    login_id: str = Field(max_length=50, sa_column_kwargs={"unique": True}, description="로그인 사용자명")
     password_hash: str = Field(max_length=255, description="해싱된 비밀번호")
     email: Optional[str] = Field(default=None, max_length=100, sa_column_kwargs={"unique": True}, description="사용자 이메일")
     name: Optional[str] = Field(default=None, max_length=100, description="사용자 전체 이름")
@@ -144,17 +144,17 @@ class User(UserBase, table=True):
     material_transactions: List["MaterialTransaction"] = Relationship(back_populates="performed_by_user")
 
     # lims 도메인 관련 관계들
-    test_requests_created: List["TestRequest"] = Relationship(back_populates="requester_user", sa_relationship_kwargs={'foreign_keys': '[TestRequest.requester_user_id]'})
-    samples_collected: List["Sample"] = Relationship(back_populates="collector_user", sa_relationship_kwargs={'foreign_keys': '[Sample.collector_user_id]'})
-    aliquot_samples_analyzed: List["AliquotSample"] = Relationship(back_populates="analyst", sa_relationship_kwargs={'foreign_keys': '[AliquotSample.analyst_user_id]'})
-    worksheets_analyzed: List["WorksheetData"] = Relationship(back_populates="analyst", sa_relationship_kwargs={'foreign_keys': '[WorksheetData.analyst_user_id]'})
-    worksheets_verified: List["WorksheetData"] = Relationship(back_populates="verifier", sa_relationship_kwargs={'foreign_keys': '[WorksheetData.verified_by_user_id]'})
-    analysis_results_analyzed: List["AnalysisResult"] = Relationship(back_populates="analyst", sa_relationship_kwargs={'foreign_keys': '[AnalysisResult.analyst_user_id]'})
-    analysis_results_approved: List["AnalysisResult"] = Relationship(back_populates="approver", sa_relationship_kwargs={'foreign_keys': '[AnalysisResult.approved_by_user_id]'})
+    test_requests_created: List["TestRequest"] = Relationship(back_populates="requester_user", sa_relationship_kwargs={'foreign_keys': '[TestRequest.requester_login_id]'})
+    samples_collected: List["Sample"] = Relationship(back_populates="collector_user", sa_relationship_kwargs={'foreign_keys': '[Sample.collector_login_id]'})
+    aliquot_samples_analyzed: List["AliquotSample"] = Relationship(back_populates="analyst", sa_relationship_kwargs={'foreign_keys': '[AliquotSample.analyst_login_id]'})
+    worksheets_analyzed: List["WorksheetData"] = Relationship(back_populates="analyst", sa_relationship_kwargs={'foreign_keys': '[WorksheetData.analyst_login_id]'})
+    worksheets_verified: List["WorksheetData"] = Relationship(back_populates="verifier", sa_relationship_kwargs={'foreign_keys': '[WorksheetData.verified_by_login_id]'})
+    analysis_results_analyzed: List["AnalysisResult"] = Relationship(back_populates="analyst", sa_relationship_kwargs={'foreign_keys': '[AnalysisResult.analyst_login_id]'})
+    analysis_results_approved: List["AnalysisResult"] = Relationship(back_populates="approver", sa_relationship_kwargs={'foreign_keys': '[AnalysisResult.approved_by_login_id]'})
     test_request_templates: List["TestRequestTemplate"] = Relationship(back_populates="user")
     pr_views: List["PrView"] = Relationship(back_populates="user")
-    calibration_records: List["CalibrationRecord"] = Relationship(back_populates="calibrated_by_user", sa_relationship_kwargs={'foreign_keys': '[CalibrationRecord.calibrated_by_user_id]'})
-    qc_sample_results: List["QcSampleResult"] = Relationship(back_populates="analyst", sa_relationship_kwargs={'foreign_keys': '[QcSampleResult.analyst_user_id]'})
+    calibration_records: List["CalibrationRecord"] = Relationship(back_populates="calibrated_by_user", sa_relationship_kwargs={'foreign_keys': '[CalibrationRecord.calibrated_by_login_id]'})
+    qc_sample_results: List["QcSampleResult"] = Relationship(back_populates="analyst", sa_relationship_kwargs={'foreign_keys': '[QcSampleResult.analyst_login_id]'})
 
     # Ops 도메인 관련 관계들
     ops_views: List["OpsView"] = Relationship(back_populates="user")

@@ -224,7 +224,7 @@ class TestRequestBase(BaseModel):
     request_date: Optional[date] = PydanticField(default=None, description="의뢰 일자 (미입력 시 오늘 날짜)")
     project_id: int = PydanticField(description="관련 프로젝트 ID (FK)")
     department_id: int = PydanticField(description="의뢰 부서 ID (FK)")
-    requester_user_id: int = PydanticField(description="의뢰 사용자 ID (FK)")
+    requester_login_id: int = PydanticField(description="의뢰 사용자 ID (FK)")
     title: str = PydanticField(description="의뢰 제목")
     label_printed: bool = PydanticField(default=False, description="라벨 인쇄 여부")
     memo: Optional[str] = PydanticField(default=None, description="메모")
@@ -242,9 +242,9 @@ class TestRequestBase(BaseModel):
 
 class TestRequestCreate(TestRequestBase):
     # <<< 수정된 부분 시작 >>>
-    # API 요청 시에는 requester_user_id가 없어도 되도록 Optional로 재정의합니다.
+    # API 요청 시에는 requester_login_id가 없어도 되도록 Optional로 재정의합니다.
     # 라우터에서 현재 로그인한 사용자로 자동 할당합니다.
-    requester_user_id: Optional[int] = PydanticField(default=None, description="의뢰 사용자 ID (FK)")
+    requester_login_id: Optional[int] = PydanticField(default=None, description="의뢰 사용자 ID (FK)")
     # <<< 수정된 부분 끝 >>>
     # request_code: Optional[str] = None  # 생성 시에는 클라이언트에서 제공하지 않음 [제거] 각각의 sample에서 분석항목 기록
 
@@ -254,7 +254,7 @@ class TestRequestUpdate(BaseModel):  # 업데이트는 모두 Optional
     request_date: Optional[date] = PydanticField(None, description="의뢰 일자")
     project_id: Optional[int] = PydanticField(None, description="관련 프로젝트 ID (FK)")
     department_id: Optional[int] = PydanticField(None, description="의뢰 부서 ID (FK)")
-    requester_user_id: Optional[int] = PydanticField(None, description="의뢰 사용자 ID (FK)")
+    requester_login_id: Optional[int] = PydanticField(None, description="의뢰 사용자 ID (FK)")
     title: Optional[str] = PydanticField(None, description="의뢰 제목")
     label_printed: Optional[bool] = PydanticField(None, description="라벨 인쇄 여부")
     memo: Optional[str] = PydanticField(None, description="메모")
@@ -308,7 +308,7 @@ class SampleBase(BaseModel):
     collector: Optional[str] = PydanticField(default=None, max_length=255, description="수집자")
     manager: Optional[str] = PydanticField(default=None, max_length=255, description="담당자")
     memo: Optional[str] = PydanticField(default=None, description="메모")
-    collector_user_id: Optional[int] = PydanticField(default=None, description="수집자 사용자 ID (FK)")
+    collector_login_id: Optional[int] = PydanticField(default=None, description="수집자 사용자 ID (FK)")
 
 
 class SampleCreate(SampleBase):
@@ -342,7 +342,7 @@ class SampleUpdate(BaseModel):  # 업데이트는 모두 Optional
     collector: Optional[str] = PydanticField(None, max_length=255, description="수집자")
     manager: Optional[str] = PydanticField(None, max_length=255, description="담당자")
     memo: Optional[str] = PydanticField(None, description="메모")
-    collector_user_id: Optional[int] = PydanticField(None, description="수집자 사용자 ID (FK)")
+    collector_login_id: Optional[int] = PydanticField(None, description="수집자 사용자 ID (FK)")
 
 
 class SampleResponse(SampleBase):
@@ -366,7 +366,7 @@ class AliquotSampleBase(BaseModel):
     used_volume: Optional[float] = PydanticField(default=None, description="분석에 사용된 시료 용량(mL)")
     analysis_status: str = PydanticField(default='Pending', max_length=20, description="분석 상태")
     analysis_date: Optional[date] = PydanticField(default=None, description="분석일")
-    analyst_user_id: Optional[int] = PydanticField(default=None, description="분석자 사용자 ID (FK)")
+    analyst_login_id: Optional[int] = PydanticField(default=None, description="분석자 사용자 ID (FK)")
     result: Optional[float] = PydanticField(default=None, description="분할 시료의 최종 분석 결과")
     unit: Optional[str] = PydanticField(default=None, max_length=50, description="결과 단위")
     qc_data: Optional[Dict[str, Any]] = PydanticField(default=None, description="품질 관리 (QC) 데이터")
@@ -386,7 +386,7 @@ class AliquotSampleUpdate(BaseModel):  # 업데이트는 모두 Optional
     parameter_id: Optional[int] = PydanticField(None, description="분석 항목 ID (FK)")
     analysis_status: Optional[str] = PydanticField(None, max_length=20, description="분석 상태")
     analysis_date: Optional[date] = PydanticField(None, description="분석일")
-    analyst_user_id: Optional[int] = PydanticField(None, description="분석자 사용자 ID (FK)")
+    analyst_login_id: Optional[int] = PydanticField(None, description="분석자 사용자 ID (FK)")
     result: Optional[float] = PydanticField(None, description="분할 시료의 최종 분석 결과")
     unit: Optional[str] = PydanticField(None, max_length=50, description="결과 단위")
     qc_data: Optional[Dict[str, Any]] = PydanticField(None, description="품질 관리 (QC) 데이터")
@@ -498,8 +498,8 @@ class WorksheetItemResponse(WorksheetItemBase):
 class WorksheetDataBase(BaseModel):
     worksheet_id: int = PydanticField(description="관련 워크시트 ID (FK)")
     data_date: date = PydanticField(description="데이터 입력/분석 일자")
-    analyst_user_id: Optional[int] = PydanticField(default=None, description="분석자 사용자 ID (FK)")
-    verified_by_user_id: Optional[int] = PydanticField(default=None, description="검증자 사용자 ID (FK)")
+    analyst_login_id: Optional[int] = PydanticField(default=None, description="분석자 사용자 ID (FK)")
+    verified_by_login_id: Optional[int] = PydanticField(default=None, description="검증자 사용자 ID (FK)")
     verified_at: Optional[datetime] = PydanticField(default=None, description="검증 일시")
     is_verified: bool = PydanticField(default=False, description="검증 완료 여부")
     notes: Optional[str] = PydanticField(default=None, description="비고")
@@ -513,8 +513,8 @@ class WorksheetDataCreate(WorksheetDataBase):
 class WorksheetDataUpdate(BaseModel):  # 업데이트는 모두 Optional
     worksheet_id: Optional[int] = PydanticField(None, description="관련 워크시트 ID (FK)")
     data_date: Optional[date] = PydanticField(None, description="데이터 입력/분석 일자")
-    analyst_user_id: Optional[int] = PydanticField(None, description="분석자 사용자 ID (FK)")
-    verified_by_user_id: Optional[int] = PydanticField(None, description="검증자 사용자 ID (FK)")
+    analyst_login_id: Optional[int] = PydanticField(None, description="분석자 사용자 ID (FK)")
+    verified_by_login_id: Optional[int] = PydanticField(None, description="검증자 사용자 ID (FK)")
     verified_at: Optional[datetime] = PydanticField(None, description="검증 일시")
     is_verified: Optional[bool] = PydanticField(None, description="검증 완료 여부")
     notes: Optional[str] = PydanticField(None, description="비고")
@@ -541,8 +541,8 @@ class AnalysisResultBase(BaseModel):
     result_value: Optional[float] = PydanticField(default=None, description="분석 결과 값")
     unit: Optional[str] = PydanticField(default=None, max_length=50, description="결과 단위")
     analysis_date: Optional[date] = PydanticField(default=None, description="분석일")
-    analyst_user_id: Optional[int] = PydanticField(default=None, description="분석자 사용자 ID (FK)")
-    approved_by_user_id: Optional[int] = PydanticField(default=None, description="승인자 사용자 ID (FK)")
+    analyst_login_id: Optional[int] = PydanticField(default=None, description="분석자 사용자 ID (FK)")
+    approved_by_login_id: Optional[int] = PydanticField(default=None, description="승인자 사용자 ID (FK)")
     approved_at: Optional[datetime] = PydanticField(default=None, description="승인 일시")
     is_approved: bool = PydanticField(default=False, description="승인 여부")
     notes: Optional[str] = PydanticField(default=None, description="비고")
@@ -560,8 +560,8 @@ class AnalysisResultUpdate(BaseModel):  # 업데이트는 모두 Optional
     result_value: Optional[float] = PydanticField(None, description="분석 결과 값")
     unit: Optional[str] = PydanticField(None, max_length=50, description="결과 단위")
     analysis_date: Optional[date] = PydanticField(None, description="분석일")
-    analyst_user_id: Optional[int] = PydanticField(None, description="분석자 사용자 ID (FK)")
-    approved_by_user_id: Optional[int] = PydanticField(None, description="승인자 사용자 ID (FK)")
+    analyst_login_id: Optional[int] = PydanticField(None, description="분석자 사용자 ID (FK)")
+    approved_by_login_id: Optional[int] = PydanticField(None, description="승인자 사용자 ID (FK)")
     approved_at: Optional[datetime] = PydanticField(None, description="승인 일시")
     is_approved: Optional[bool] = PydanticField(None, description="승인 여부")
     notes: Optional[str] = PydanticField(None, description="비고")
@@ -581,17 +581,17 @@ class AnalysisResultResponse(AnalysisResultBase):
 # =============================================================================
 class TestRequestTemplateBase(BaseModel):
     name: str = PydanticField(max_length=255, description="템플릿명")
-    user_id: int = PydanticField(description="생성 사용자 ID (FK)")  # routers에서 current_user_id로 기본값 설정 가능
+    login_id: int = PydanticField(description="생성 사용자 ID (FK)")  # routers에서 current_login_id로 기본값 설정 가능
     serialized_text: Dict[str, Any] = PydanticField(description="템플릿 내용 (JSONB)")
 
 
 class TestRequestTemplateCreate(TestRequestTemplateBase):
-    user_id: Optional[int] = PydanticField(default=None, description="생성 사용자 ID (FK)")  # 라우터에서 current_user.id로 설정될 수 있도록 Optional로 변경
+    login_id: Optional[int] = PydanticField(default=None, description="생성 사용자 ID (FK)")  # 라우터에서 current_user.id로 설정될 수 있도록 Optional로 변경
 
 
 class TestRequestTemplateUpdate(BaseModel):  # 업데이트는 모두 Optional
     name: Optional[str] = PydanticField(None, max_length=255, description="템플릿명")
-    user_id: Optional[int] = PydanticField(None, description="생성 사용자 ID (FK)")
+    login_id: Optional[int] = PydanticField(None, description="생성 사용자 ID (FK)")
     serialized_text: Optional[Dict[str, Any]] = PydanticField(None, description="템플릿 내용 (JSONB)")
 
 
@@ -650,7 +650,7 @@ class CalibrationRecordBase(BaseModel):
     parameter_id: int = PydanticField(description="교정된 분석 항목 ID (FK)")
     calibration_date: datetime = PydanticField(description="교정 일시")
     next_calibration_date: Optional[datetime] = PydanticField(default=None, description="다음 교정 예정일")
-    calibrated_by_user_id: Optional[int] = PydanticField(default=None, description="교정 수행자 사용자 ID (FK)")
+    calibrated_by_login_id: Optional[int] = PydanticField(default=None, description="교정 수행자 사용자 ID (FK)")
     standard_sample_id: Optional[int] = PydanticField(default=None, description="사용된 표준 시료 ID (FK)")
     calibration_curve_data: Optional[Dict[str, Any]] = PydanticField(default=None, description="교정 곡선 데이터")
     acceptance_criteria_met: Optional[bool] = PydanticField(default=None, description="허용 기준 충족 여부")
@@ -666,7 +666,7 @@ class CalibrationRecordUpdate(BaseModel):  # 업데이트는 모두 Optional
     parameter_id: Optional[int] = PydanticField(None, description="교정된 분석 항목 ID (FK)")
     calibration_date: Optional[datetime] = PydanticField(None, description="교정 일시")
     next_calibration_date: Optional[datetime] = PydanticField(None, description="다음 교정 예정일")
-    calibrated_by_user_id: Optional[int] = PydanticField(None, description="교정 수행자 사용자 ID (FK)")
+    calibrated_by_login_id: Optional[int] = PydanticField(None, description="교정 수행자 사용자 ID (FK)")
     standard_sample_id: Optional[int] = PydanticField(None, description="사용된 표준 시료 ID (FK)")
     calibration_curve_data: Optional[Dict[str, Any]] = PydanticField(None, description="교정 곡선 데이터")
     acceptance_criteria_met: Optional[bool] = PydanticField(None, description="허용 기준 충족 여부")
@@ -696,12 +696,12 @@ class QcSampleResultBase(BaseModel):
     acceptance_criteria: Optional[Dict[str, Any]] = PydanticField(default=None, description="허용 기준")
     passed_qc: Optional[bool] = PydanticField(default=None, description="QC 통과 여부")
     analysis_date: date = PydanticField(description="분석일")
-    analyst_user_id: int = PydanticField(description="분석자 사용자 ID (FK)")  # routers에서 current_user_id로 기본값 설정 가능
+    analyst_login_id: int = PydanticField(description="분석자 사용자 ID (FK)")  # routers에서 current_login_id로 기본값 설정 가능
     notes: Optional[str] = PydanticField(default=None, description="비고")
 
 
 class QcSampleResultCreate(QcSampleResultBase):
-    analyst_user_id: Optional[int] = PydanticField(default=None, description="분석자 사용자 ID (FK)")  # 라우터에서 current_user.id로 설정될 수 있도록 Optional로 변경
+    analyst_login_id: Optional[int] = PydanticField(default=None, description="분석자 사용자 ID (FK)")  # 라우터에서 current_user.id로 설정될 수 있도록 Optional로 변경
 
 
 class QcSampleResultUpdate(BaseModel):  # 업데이트는 모두 Optional
@@ -715,7 +715,7 @@ class QcSampleResultUpdate(BaseModel):  # 업데이트는 모두 Optional
     acceptance_criteria: Optional[Dict[str, Any]] = PydanticField(None, description="허용 기준")
     passed_qc: Optional[bool] = PydanticField(None, description="QC 통과 여부")
     analysis_date: Optional[date] = PydanticField(None, description="분석일")
-    analyst_user_id: Optional[int] = PydanticField(None, description="분석자 사용자 ID (FK)")
+    analyst_login_id: Optional[int] = PydanticField(None, description="분석자 사용자 ID (FK)")
     notes: Optional[str] = PydanticField(None, description="비고")
 
 
@@ -733,7 +733,7 @@ class QcSampleResultResponse(QcSampleResultBase):
 # =============================================================================
 class PrViewBase(BaseModel):
     name: str = PydanticField(max_length=255, description="보기 설정명")
-    user_id: int = PydanticField(description="생성 사용자 ID (FK)")  # routers에서 current_user_id로 기본값 설정 가능
+    login_id: int = PydanticField(description="생성 사용자 ID (FK)")  # routers에서 current_login_id로 기본값 설정 가능
     facility_id: int = PydanticField(description="단일 필터용 처리시설 ID (FK)")  # plant_id는 생성 시 필수
     facility_ids: Optional[List[int]] = PydanticField(default=None, description="선택된 처리시설 ID 목록 (JSONB 배열)")  # plant_ids는 Optional
     sampling_point_ids: Optional[List[int]] = PydanticField(default=None, description="선택된 채수 지점 ID 목록 (JSONB 배열)")
@@ -742,12 +742,12 @@ class PrViewBase(BaseModel):
 
 
 class PrViewCreate(PrViewBase):
-    user_id: Optional[int] = PydanticField(default=None, description="생성 사용자 ID (FK)")  # 라우터에서 current_user.id로 설정될 수 있도록 Optional로 변경
+    login_id: Optional[int] = PydanticField(default=None, description="생성 사용자 ID (FK)")  # 라우터에서 current_user.id로 설정될 수 있도록 Optional로 변경
 
 
 class PrViewUpdate(BaseModel):  # 업데이트는 모두 Optional
     name: Optional[str] = PydanticField(None, max_length=255, description="보기 설정명")
-    user_id: Optional[int] = PydanticField(None, description="생성 사용자 ID (FK)")
+    login_id: Optional[int] = PydanticField(None, description="생성 사용자 ID (FK)")
     facility_id: Optional[int] = PydanticField(None, description="단일 필터용 처리시설 ID (FK)")
     facility_ids: Optional[List[int]] = PydanticField(None, description="선택된 처리시설 ID 목록")
     sampling_point_ids: Optional[List[int]] = PydanticField(None, description="선택된 채수 지점 ID 목록")

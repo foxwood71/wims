@@ -251,7 +251,7 @@ class EquipmentHistoryBase(SQLModel):
         description="레코드 변경 일시"
     )
     description: Optional[str] = Field(default=None)
-    performed_by_user_id: Optional[int] = Field(default=None, foreign_key="usr.users.id")
+    performed_by_login_id: Optional[int] = Field(default=None, foreign_key="usr.users.id")
     service_provider_vendor_id: Optional[int] = Field(default=None, foreign_key="ven.vendors.id")
     outsourcing: bool = Field(default=False)
     next_service_date: Optional[datetime] = Field(default=None)

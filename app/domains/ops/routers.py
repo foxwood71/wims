@@ -26,7 +26,7 @@ from app.domains.ops import schemas as ops_schemas
 
 # 다른 도메인의 CRUD (FK 유효성 검증용)
 from app.domains.loc import crud as loc_crud  # facility_id 확인용
-from app.domains.usr import crud as usr_crud  # user_id 확인용
+from app.domains.usr import crud as usr_crud  # login_id 확인용
 
 
 router = APIRouter(
@@ -450,19 +450,19 @@ async def create_ops_view(
     """
     새로운 사용자 정의 운영 데이터 보기 설정을 생성합니다.
     - `name`: 보기 설정명 (필수)
-    - `user_id`: 생성 사용자 ID (필수, 기본값: 현재 로그인 사용자)
+    - `login_id`: 생성 사용자 ID (필수, 기본값: 현재 로그인 사용자)
     - `facility_ids`: 처리시설 ID 목록 (JSONB 배열, 선택 사항)
     """
-    if view_create.user_id is None:  # 사용자 ID가 제공되지 않았다면 현재 로그인 사용자의 ID를 사용
-        view_create.user_id = current_user.id
+    if view_create.login_id is None:  # 사용자 ID가 제공되지 않았다면 현재 로그인 사용자의 ID를 사용
+        view_create.login_id = current_user.id
     else:  # 제공되었다면 해당 사용자 존재 여부 확인
-        db_user = await usr_crud.user.get(db, id=view_create.user_id)
+        db_user = await usr_crud.user.get(db, id=view_create.login_id)
         if not db_user:
             raise HTTPException(status_code=400, detail="User not found for the given ID.")
 
     # 동일 사용자 내에서 이름 중복 확인
     db_view = await ops_crud.ops_view.get_by_name_and_user(
-        db, name=view_create.name, user_id=view_create.user_id
+        db, name=view_create.name, login_id=view_create.login_id
     )
     if db_view:
         raise HTTPException(status_code=400, detail="User defined view with this name already exists for this user.")
@@ -475,7 +475,7 @@ async def create_ops_view(
 
 @router.get("/views", response_model=List[ops_schemas.OpsViewResponse], summary="모든 사용자 정의 운영 데이터 보기 목록 조회")
 async def read_ops_views(
-    user_id: Optional[int] = None,  # 특정 사용자 보기 필터링
+    login_id: Optional[int] = None,  # 특정 사용자 보기 필터링
     facility_id: Optional[int] = None,  # 특정 처리장 ID를 포함하는 보기 필터링
     skip: int = 0,
     limit: int = 100,
@@ -483,11 +483,11 @@ async def read_ops_views(
 ):
     """
     모든 사용자 정의 운영 데이터 보기 목록을 조회하거나, 필터링하여 조회합니다.
-    - `user_id`: 특정 사용자 ID로 필터링 (선택 사항)
+    - `login_id`: 특정 사용자 ID로 필터링 (선택 사항)
     - `facility_id`: 특정 처리시설 ID를 포함하는 보기만 필터링 (JSONB 배열 내 검색)
     """
-    if user_id:
-        views = await ops_crud.ops_view.get_views_by_user(db, user_id=user_id, skip=skip, limit=limit)
+    if login_id:
+        views = await ops_crud.ops_view.get_views_by_user(db, login_id=login_id, skip=skip, limit=limit)
     elif facility_id:
         views = await ops_crud.ops_view.get_views_by_plant_id(db, facility_id=facility_id, skip=skip, limit=limit)
     else:
@@ -526,13 +526,13 @@ async def update_ops_view(
         raise HTTPException(status_code=404, detail="User defined view not found.")
 
     # 권한 확인: 자신이 생성한 설정이거나 관리자만 수정 가능
-    if db_view.user_id != current_user.id and current_user.role < 10:
+    if db_view.login_id != current_user.id and current_user.role < 10:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not enough permissions to update this view.")
 
     # 이름 변경 시 중복 확인 (동일 사용자 내에서)
     if view_update.name and view_update.name != db_view.name:
         existing_view_by_name = await ops_crud.ops_view.get_by_name_and_user(
-            db, name=view_update.name, user_id=db_view.user_id  # 기존 user_id 기준
+            db, name=view_update.name, login_id=db_view.login_id  # 기존 login_id 기준
         )
         if existing_view_by_name and existing_view_by_name.id != view_id:
             raise HTTPException(status_code=400, detail="Another view with this name already exists for this user.")
@@ -558,7 +558,7 @@ async def delete_ops_view(
         raise HTTPException(status_code=404, detail="User defined view not found.")
 
     # 권한 확인: 자신이 생성한 설정이거나 관리자만 삭제 가능
-    if db_view.user_id != current_user.id and current_user.role < 10:
+    if db_view.login_id != current_user.id and current_user.role < 10:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not enough permissions to delete this view.")
 
     await ops_crud.ops_view.delete(db, id=view_id)

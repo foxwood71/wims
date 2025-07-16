@@ -226,7 +226,7 @@ class MaterialTransactionBase(SQLModel):
     related_equipment_id: Optional[int] = Field(None, description="관련 설비 ID (FK)")
     related_equipment_history_id: Optional[int] = Field(None, description="관련 설비 이력 ID (FK)")
     source_batch_id: Optional[int] = Field(None, description="사용된 배치 ID (FK)")
-    performed_by_user_id: Optional[int] = Field(None, description="거래 수행 사용자 ID (FK)")
+    performed_by_login_id: Optional[int] = Field(None, description="거래 수행 사용자 ID (FK)")
     vendor_id: Optional[int] = Field(None, description="관련 공급업체 ID (FK, 구매 시)")
     unit_price: Optional[float] = Field(0.0, description="단가 (구매 시) (NUMERIC(19, 4))")
     notes: Optional[str] = Field(None, description="비고")

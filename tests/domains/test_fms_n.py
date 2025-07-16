@@ -488,7 +488,7 @@ class TestEquipmentHistory:
         assert response.status_code == 201
         created_history = response.json()
         assert created_history["equipment_id"] == fms_test_equipment.id
-        assert created_history["performed_by_user_id"] == test_user.id
+        assert created_history["performed_by_login_id"] == test_user.id
 
     async def test_create_equipment_history_with_invalid_fk_fails(self, admin_client: AsyncClient):
         """(실패) 존재하지 않는 설비 ID로 이력 생성 시 400 Bad Request"""

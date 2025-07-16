@@ -139,7 +139,7 @@ async def test_resource_permissions_as_admin(
     """[수정] RBAC: 관리자는 소유권과 관계없이 모든 리소스를 수정/삭제할 수 있습니다."""
     # 다른 사용자를 생성합니다.
     other_user = usr_models.User(
-        user_id="otheruser_for_admin_test",
+        login_id="otheruser_for_admin_test",
         password_hash=get_password_hash_fixture("password"),
         role=usr_models.UserRole.GENERAL_USER
     )
@@ -252,7 +252,7 @@ async def test_image_permissions_as_unauthorized_role(
     """[RBAC] 관련 없는 역할을 가진 사용자는 다른 엔티티의 이미지를 수정/삭제할 수 없습니다."""
     # 시나리오 1: 일반 사용자가 다른 일반 사용자의 리소스 수정/삭제 시도
     other_user = usr_models.User(
-        user_id="another_user",
+        login_id="another_user",
         password_hash=get_password_hash_fixture("password"),
     )
     db_session.add(other_user)

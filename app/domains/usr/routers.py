@@ -43,7 +43,7 @@ async def login_for_access_token(
     db: AsyncSession = Depends(get_session),
 ):
     user = await usr_crud.user.authenticate(
-        db, user_id=form_data.username, password=form_data.password
+        db, login_id=form_data.username, password=form_data.password
     )
     if not user:
         raise HTTPException(
@@ -55,7 +55,7 @@ async def login_for_access_token(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Inactive user")
 
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = deps.create_access_token(data={"sub": user.user_id}, expires_delta=access_token_expires)
+    access_token = deps.create_access_token(data={"sub": user.login_id}, expires_delta=access_token_expires)
     return {"access_token": access_token, "token_type": "bearer"}
 
 
@@ -178,9 +178,9 @@ async def read_users(
     return users
 
 
-@router.get("/users/{user_id}", response_model=usr_schemas.UserRead, summary="특정 사용자 조회")
+@router.get("/users/{login_id}", response_model=usr_schemas.UserRead, summary="특정 사용자 조회")
 async def read_user(
-    user_id: int,
+    login_id: int,
     db: AsyncSession = Depends(get_session),
     current_user: usr_models.User = Depends(deps.get_current_active_user),
 ):
@@ -189,7 +189,7 @@ async def read_user(
     - 관리자는 모든 사용자 정보를 조회할 수 있습니다.
     - 일반 사용자는 자신의 정보만 조회할 수 있습니다.
     """
-    user = await usr_crud.user.get(db, user_id)
+    user = await usr_crud.user.get(db, login_id)
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
@@ -202,9 +202,9 @@ async def read_user(
     return user
 
 
-@router.put("/users/{user_id}", response_model=usr_schemas.UserRead, summary="사용자 업데이트")
+@router.put("/users/{login_id}", response_model=usr_schemas.UserRead, summary="사용자 업데이트")
 async def update_user(
-    user_id: int,
+    login_id: int,
     user_in: usr_schemas.UserUpdate,
     db: AsyncSession = Depends(get_session),
     current_user: usr_models.User = Depends(deps.get_current_active_user),
@@ -214,7 +214,7 @@ async def update_user(
     - 관리자는 모든 사용자 정보를 업데이트할 수 있습니다.
     - 일반 사용자는 자신의 정보만 업데이트할 수 있습니다.
     """
-    db_user = await usr_crud.user.get(db, user_id)
+    db_user = await usr_crud.user.get(db, login_id)
     if not db_user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
@@ -228,26 +228,26 @@ async def update_user(
     # 이메일 중복 검사 로직 추가:
     if user_in.email is not None and user_in.email != db_user.email:
         existing_user_with_email = await usr_crud.user.get_by_email(db, email=user_in.email)
-        if existing_user_with_email and existing_user_with_email.id != user_id:
+        if existing_user_with_email and existing_user_with_email.id != login_id:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already registered")
     return await usr_crud.user.update(db, db_obj=db_user, obj_in=user_in)
 
 
-@router.delete("/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT, summary="사용자 삭제")
+@router.delete("/users/{login_id}", status_code=status.HTTP_204_NO_CONTENT, summary="사용자 삭제")
 async def delete_user(
-    user_id: int,
+    login_id: int,
     db: AsyncSession = Depends(get_session),
     current_superuser: usr_models.User = Depends(deps.get_current_admin_user),
 ):
     """
     ID로 사용자를 삭제합니다. 최고 관리자(Superuser) 권한이 필요합니다.
     """
-    db_user = await usr_crud.user.get(db, user_id)
+    db_user = await usr_crud.user.get(db, login_id)
     if not db_user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
     if db_user.id == current_superuser.id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot delete your own superuser account.")
 
-    await usr_crud.user.remove(db, id=user_id)
+    await usr_crud.user.remove(db, id=login_id)
     return None

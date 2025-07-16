@@ -436,9 +436,9 @@ async def create_equipment_history(
     if not await fms_crud.equipment.get(db, id=history_create.equipment_id):
         raise HTTPException(status_code=400, detail="Equipment not found for the given ID.")
 
-    if history_create.performed_by_user_id is None:
-        history_create.performed_by_user_id = current_user.id
-    elif not await usr_crud.user.get(db, id=history_create.performed_by_user_id):
+    if history_create.performed_by_login_id is None:
+        history_create.performed_by_login_id = current_user.id
+    elif not await usr_crud.user.get(db, id=history_create.performed_by_login_id):
         raise HTTPException(status_code=400, detail="Performed by user not found for the given ID.")
 
     if history_create.service_provider_vendor_id:

@@ -277,7 +277,7 @@ class MaterialTransactionBase(SQLModel):
     related_equipment_id: Optional[int] = Field(default=None, foreign_key="fms.equipments.id")
     related_equipment_history_id: Optional[int] = Field(default=None, foreign_key="fms.equipment_history.id")
     source_batch_id: Optional[int] = Field(default=None, foreign_key="inv.material_batches.id")
-    performed_by_user_id: Optional[int] = Field(default=None, foreign_key="usr.users.id")
+    performed_by_login_id: Optional[int] = Field(default=None, foreign_key="usr.users.id")
     vendor_id: Optional[int] = Field(default=None, foreign_key="ven.vendors.id")
     unit_price: Optional[float] = Field(default=0, sa_column=Column(Numeric(19, 4)))
     notes: Optional[str] = Field(default=None)

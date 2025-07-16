@@ -234,7 +234,7 @@ class OpsViewBase(SQLModel):
     ops.views 테이블의 기본 속성을 정의하는 SQLModel Base 클래스입니다.
     """
     name: str = Field(max_length=255, description="운영 데이터 보기 이름")
-    user_id: int = Field(
+    login_id: int = Field(
         sa_column=Column(ForeignKey("usr.users.id", onupdate="CASCADE", ondelete="RESTRICT")),  # ForeignKey 객체 사용
         description="운영 데이터 보기 사용자 ID (FK)"
     )
@@ -277,7 +277,7 @@ class OpsView(OpsViewBase, table=True):
     # User(usr.users)와의 관계 (다대일)
     user: "User" = Relationship(
         sa_relationship_kwargs={
-            "foreign_keys": "OpsView.user_id",  # 명시적인 foreign_key 지정
+            "foreign_keys": "OpsView.login_id",  # 명시적인 foreign_key 지정
             "cascade": "all"
         }
     )

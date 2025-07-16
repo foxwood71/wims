@@ -25,7 +25,7 @@ async def test_login_for_access_token_success(  # Flake8: E128, E501
     올바른 사용자명과 비밀번호로 로그인하여 액세스 토큰을 성공적으로 발급받는지 테스트합니다.
     """
     login_data = {  # Flake8: E121
-        "username": test_user.user_id,  # Flake8: E121
+        "username": test_user.login_id,  # Flake8: E121
         "password": "testpass123"  # conftest.py에서 test_user 생성 시 사용한 비밀번호  # Flake8: E121
     }
 
@@ -49,7 +49,7 @@ async def test_login_for_access_token_wrong_password(  # Flake8: E128, E501
     response = await client.post(  # Flake8: E121
         "/api/v1/usr/auth/token",  # Flake8: E121
         data={  # Flake8: E121
-            "username": test_user.user_id,  # Flake8: E121
+            "username": test_user.login_id,  # Flake8: E121
             "password": "wrong_password"  # Flake8: E121
         },  # Flake8: E121
     )
@@ -86,7 +86,7 @@ async def test_login_for_access_token_inactive_user(  # Flake8: E128, E501
     # 비활성 사용자 생성
     hashed_password = get_password_hash("testpassword123")
     inactive_user = user_models(  # Flake8: E121
-        user_id="inactiveuser",  # Flake8: E121
+        login_id="inactiveuser",  # Flake8: E121
         email="inactive@example.com",  # Flake8: E121
         password_hash=hashed_password,  # Flake8: E121
         is_active=False  # Flake8: E121
@@ -97,7 +97,7 @@ async def test_login_for_access_token_inactive_user(  # Flake8: E128, E501
     response = await client.post(  # Flake8: E121
         "/api/v1/usr/auth/token",  # Flake8: E121
         data={  # Flake8: E121
-            "username": inactive_user.user_id,  # Flake8: E121
+            "username": inactive_user.login_id,  # Flake8: E121
             "password": "testpassword123"  # Flake8: E121
         },  # Flake8: E121
     )
@@ -118,7 +118,7 @@ async def test_read_users_me_success(  # Flake8: E128, E501
 
     assert response.status_code == 200
     response_data = response.json()
-    assert response_data["user_id"] == test_user.user_id
+    assert response_data["login_id"] == test_user.login_id
     assert response_data["id"] == test_user.id
     assert "password_hash" not in response_data
 

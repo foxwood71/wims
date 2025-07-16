@@ -212,7 +212,7 @@ class TestRequest(SQLModel, table=True):
     request_date: date
     project_id: int = Field(foreign_key="lims.projects.id")
     department_id: int = Field(foreign_key="usr.departments.id")
-    requester_user_id: int = Field(foreign_key="usr.users.id")
+    requester_login_id: int = Field(foreign_key="usr.users.id")
     title: str = Field(max_length=255)
     label_printed: bool = Field(default=False)
     memo: Optional[str] = Field(default=None)
@@ -278,7 +278,7 @@ class Sample(SQLModel, table=True):
     complete_date: Optional[date] = Field(default=None)
     disposal_date: Optional[date] = Field(default=None)
     storage_period: Optional[int] = Field(default=None)
-    collector_user_id: Optional[int] = Field(default=None, foreign_key="usr.users.id")
+    collector_login_id: Optional[int] = Field(default=None, foreign_key="usr.users.id")
     collector: Optional[str] = Field(default=None, max_length=255)
     manager: Optional[str] = Field(default=None, max_length=255)
     memo: Optional[str] = Field(default=None)
@@ -319,7 +319,7 @@ class AliquotSample(SQLModel, table=True):
     used_volume: Optional[float] = Field(default=None, sa_column=Column(REAL), description="분석에 사용된 시료 용량(mL)")
     analysis_status: str = Field(default='Pending', max_length=20)
     analysis_date: Optional[date] = Field(default=None)
-    analyst_user_id: Optional[int] = Field(default=None, foreign_key="usr.users.id")
+    analyst_login_id: Optional[int] = Field(default=None, foreign_key="usr.users.id")
     result: Optional[float] = Field(default=None, sa_column=Column(REAL))
     unit: Optional[str] = Field(default=None, max_length=50)
     qc_data: Optional[Dict[str, Any]] = Field(default=None, sa_column=Column(JSONB))
@@ -425,8 +425,8 @@ class WorksheetData(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     worksheet_id: int = Field(foreign_key="lims.worksheets.id")
     data_date: date
-    analyst_user_id: Optional[int] = Field(default=None, foreign_key="usr.users.id")
-    verified_by_user_id: Optional[int] = Field(default=None, foreign_key="usr.users.id")
+    analyst_login_id: Optional[int] = Field(default=None, foreign_key="usr.users.id")
+    verified_by_login_id: Optional[int] = Field(default=None, foreign_key="usr.users.id")
     verified_at: Optional[datetime] = Field(default=None)
     is_verified: bool = Field(default=False)
     notes: Optional[str] = Field(default=None)
@@ -445,11 +445,11 @@ class WorksheetData(SQLModel, table=True):
     worksheet: "Worksheet" = Relationship(back_populates="data_records")
     analyst: Optional["User"] = Relationship(
         back_populates="worksheets_analyzed",
-        sa_relationship_kwargs={'foreign_keys': '[WorksheetData.analyst_user_id]'}
+        sa_relationship_kwargs={'foreign_keys': '[WorksheetData.analyst_login_id]'}
     )
     verifier: Optional["User"] = Relationship(
         back_populates="worksheets_verified",
-        sa_relationship_kwargs={'foreign_keys': '[WorksheetData.verified_by_user_id]'}
+        sa_relationship_kwargs={'foreign_keys': '[WorksheetData.verified_by_login_id]'}
     )
 
     analysis_results: List["AnalysisResult"] = Relationship(
@@ -471,8 +471,8 @@ class AnalysisResult(SQLModel, table=True):
     result_value: Optional[float] = Field(default=None, sa_column=Column(REAL))
     unit: Optional[str] = Field(default=None, max_length=50)
     analysis_date: Optional[date] = Field(default=None)
-    analyst_user_id: Optional[int] = Field(default=None, foreign_key="usr.users.id")
-    approved_by_user_id: Optional[int] = Field(default=None, foreign_key="usr.users.id")
+    analyst_login_id: Optional[int] = Field(default=None, foreign_key="usr.users.id")
+    approved_by_login_id: Optional[int] = Field(default=None, foreign_key="usr.users.id")
     approved_at: Optional[datetime] = Field(default=None)
     is_approved: bool = Field(default=False)
     notes: Optional[str] = Field(default=None)
@@ -493,11 +493,11 @@ class AnalysisResult(SQLModel, table=True):
     worksheet_data: "WorksheetData" = Relationship(back_populates="analysis_results")
     analyst: Optional["User"] = Relationship(
         back_populates="analysis_results_analyzed",
-        sa_relationship_kwargs={'foreign_keys': '[AnalysisResult.analyst_user_id]'}
+        sa_relationship_kwargs={'foreign_keys': '[AnalysisResult.analyst_login_id]'}
     )
     approver: Optional["User"] = Relationship(
         back_populates="analysis_results_approved",
-        sa_relationship_kwargs={'foreign_keys': '[AnalysisResult.approved_by_user_id]'}
+        sa_relationship_kwargs={'foreign_keys': '[AnalysisResult.approved_by_login_id]'}
     )
 
 # ... (TestRequestTemplate, PrView, StandardSample, CalibrationRecord, QcSampleResult 모델도 유사한 패턴으로 수정) ...
@@ -508,7 +508,7 @@ class TestRequestTemplate(SQLModel, table=True):
     __table_args__ = {'schema': 'lims'}
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str = Field(max_length=255)
-    user_id: int = Field(foreign_key="usr.users.id")
+    login_id: int = Field(foreign_key="usr.users.id")
     serialized_text: Dict[str, Any] = Field(sa_column=Column(JSONB))
     created_at: Optional[datetime] = Field(
         default_factory=lambda: datetime.now(UTC),
@@ -565,7 +565,7 @@ class CalibrationRecord(SQLModel, table=True):
         sa_column=Column(TIMESTAMP(timezone=True), server_default=func.now()),
         description="차기 교정 일시"
     )
-    calibrated_by_user_id: Optional[int] = Field(default=None, foreign_key="usr.users.id")
+    calibrated_by_login_id: Optional[int] = Field(default=None, foreign_key="usr.users.id")
     standard_sample_id: Optional[int] = Field(default=None, foreign_key="lims.standard_samples.id")
     calibration_curve_data: Optional[Dict[str, Any]] = Field(default=None, sa_column=Column(JSONB))
     acceptance_criteria_met: Optional[bool] = Field(default=None)
@@ -585,7 +585,7 @@ class CalibrationRecord(SQLModel, table=True):
     parameter: "Parameter" = Relationship(back_populates="calibration_records")
     calibrated_by_user: Optional["User"] = Relationship(
         back_populates="calibration_records",
-        sa_relationship_kwargs={'foreign_keys': '[CalibrationRecord.calibrated_by_user_id]'}
+        sa_relationship_kwargs={'foreign_keys': '[CalibrationRecord.calibrated_by_login_id]'}
     )
     standard_sample: Optional["StandardSample"] = Relationship(back_populates="calibration_records")
 
@@ -604,7 +604,7 @@ class QcSampleResult(SQLModel, table=True):
     acceptance_criteria: Optional[Dict[str, Any]] = Field(default=None, sa_column=Column(JSONB))
     passed_qc: Optional[bool] = Field(default=None)
     analysis_date: date
-    analyst_user_id: int = Field(foreign_key="usr.users.id")
+    analyst_login_id: int = Field(foreign_key="usr.users.id")
     notes: Optional[str] = Field(default=None)
     created_at: Optional[datetime] = Field(
         default_factory=lambda: datetime.now(UTC),
@@ -621,7 +621,7 @@ class QcSampleResult(SQLModel, table=True):
     parameter: "Parameter" = Relationship(back_populates="qc_sample_results")
     analyst: "User" = Relationship(
         back_populates="qc_sample_results",
-        sa_relationship_kwargs={'foreign_keys': '[QcSampleResult.analyst_user_id]'}
+        sa_relationship_kwargs={'foreign_keys': '[QcSampleResult.analyst_login_id]'}
     )
 
 
@@ -630,7 +630,7 @@ class PrView(SQLModel, table=True):
     __table_args__ = {'schema': 'lims'}
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str = Field(max_length=255)
-    user_id: int = Field(foreign_key="usr.users.id")
+    login_id: int = Field(foreign_key="usr.users.id")
     facility_id: int = Field(foreign_key="loc.facilities.id")
     facility_ids: Optional[List[int]] = Field(default=None, sa_column=Column(JSONB))
     sampling_point_ids: Optional[List[int]] = Field(default=None, sa_column=Column(JSONB))

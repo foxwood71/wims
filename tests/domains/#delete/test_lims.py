@@ -684,7 +684,7 @@ async def test_delete_weather_condition_success_admin(admin_client: TestClient, 
 async def test_create_test_request_invalid_fk_admin(
     admin_client: TestClient,
     test_department: usr_models.Department,  # FK
-    test_sampler_user: usr_models.User,  # FK (requester_user_id)
+    test_sampler_user: usr_models.User,  # FK (requester_login_id)
 ):
     """
     관리자 권한으로 유효하지 않은 FK (예: 없는 프로젝트 ID)로 시험 의뢰 생성 시도 시 404 Not Found를 반환하는지 테스트합니다.
@@ -695,7 +695,7 @@ async def test_create_test_request_invalid_fk_admin(
         "request_date": str(date.today()),
         "project_id": 99999,  # 존재하지 않는 프로젝트 ID
         "department_id": test_department.id,
-        "requester_user_id": test_sampler_user.id,
+        "requester_login_id": test_sampler_user.id,
         "title": "잘못된 FK 테스트",
         "requested_parameters": {"TEMP": True},
     }
@@ -731,15 +731,15 @@ async def test_read_test_requests_filtered_by_project_id(
     # test_user (authorized_client에 연결된 사용자)가 요청한 의뢰
     await test_request_crud.create(db_session, obj_in=lims_schemas.TestRequestCreate(
         request_date=date.today(), project_id=proj1.id, department_id=test_department.id,
-        requester_user_id=test_user.id,  # authorized_client의 user_id와 일치시킵니다.
+        requester_login_id=test_user.id,  # authorized_client의 login_id와 일치시킵니다.
         title="일반 사용자_필터 의뢰 1", requested_parameters={}
-    ), current_user_id=test_user.id)  # current_user_id도 test_user.id로 전달
+    ), current_login_id=test_user.id)  # current_login_id도 test_user.id로 전달
 
     await test_request_crud.create(db_session, obj_in=lims_schemas.TestRequestCreate(
         request_date=date.today(), project_id=proj1.id, department_id=test_department.id,
-        requester_user_id=test_user.id,  # authorized_client의 user_id와 일치시킵니다.
+        requester_login_id=test_user.id,  # authorized_client의 login_id와 일치시킵니다.
         title="일반 사용자_필터 의뢰 2", requested_parameters={}
-    ), current_user_id=test_user.id)  # current_user_id도 test_user.id로 전달
+    ), current_login_id=test_user.id)  # current_login_id도 test_user.id로 전달
 
     # 다른 사용자(예: test_sampler_user)가 요청한 의뢰. 이 의뢰는 test_user가 조회할 때 보이지 않아야 합니다.
     # test_sampler_user 픽스처가 test_user와 다른 사용자를 생성한다고 가정합니다.
@@ -748,9 +748,9 @@ async def test_read_test_requests_filtered_by_project_id(
     # (conftest.py에서 test_user와 test_sampler_user가 다른 사용자 ID를 갖는지 확인 필요)
     await test_request_crud.create(db_session, obj_in=lims_schemas.TestRequestCreate(
         request_date=date.today(), project_id=proj2.id, department_id=test_department.id,
-        requester_user_id=test_user.id,  # test_user와 다른 사용자 ID
+        requester_login_id=test_user.id,  # test_user와 다른 사용자 ID
         title="다른 사용자_필터 의뢰 3", requested_parameters={}
-    ), current_user_id=test_user.id)  # current_user_id도 해당 사용자의 ID로 전달
+    ), current_login_id=test_user.id)  # current_login_id도 해당 사용자의 ID로 전달
 
     response = await authorized_client.get(f"/api/v1/lims/test_requests?project_id={proj1.id}")
     print(f"Response status code: {response.status_code}")
@@ -763,7 +763,7 @@ async def test_read_test_requests_filtered_by_project_id(
     # 따라서 예상되는 결과는 정확히 2개여야 합니다.
     assert len(requests) == 2
     assert all(r["project_id"] == proj1.id for r in requests)
-    assert all(r["requester_user_id"] == test_user.id for r in requests)
+    assert all(r["requester_login_id"] == test_user.id for r in requests)
     assert any(r["title"] == "일반 사용자_필터 의뢰 1" for r in requests)
     assert any(r["title"] == "일반 사용자_필터 의뢰 2" for r in requests)
     # 다른 사용자가 생성한 의뢰는 조회되지 않아야 합니다.
@@ -789,15 +789,15 @@ async def test_read_samples_by_request_id(
     (자신이 수집한 시료만 조회됨)
     """
     print("\n--- Running test_read_samples_by_request_id ---")
-    # TestRequest 생성 시 requester_user_id를 test_user.id로 설정하여,
+    # TestRequest 생성 시 requester_login_id를 test_user.id로 설정하여,
     # authorized_client가 나중에 이 TestRequest를 기반으로 Sample을 조회할 때 권한 문제가 없도록 합니다.
-    # Note: TestRequest 생성 시 current_user_id는 TestRequest CRUD 로직에서 사용되므로,
+    # Note: TestRequest 생성 시 current_login_id는 TestRequest CRUD 로직에서 사용되므로,
     # 여기서는 test_sampler_user를 사용하되, 나중에 Sample 생성 시에는 test_user를 사용합니다.
     req1 = lims_models.TestRequest(request_date=date.today(), project_id=test_lims_project.id,
-                                   department_id=test_department.id, requester_user_id=test_user.id,  # test_user.id로 변경
+                                   department_id=test_department.id, requester_login_id=test_user.id,  # test_user.id로 변경
                                    title="시료 조회 의뢰1", requested_parameters={"A": True})
     req2 = lims_models.TestRequest(request_date=date.today(), project_id=test_lims_project.id,
-                                   department_id=test_department.id, requester_user_id=test_user.id,  # test_user.id로 변경
+                                   department_id=test_department.id, requester_login_id=test_user.id,  # test_user.id로 변경
                                    title="시료 조회 의뢰2", requested_parameters={"B": True})
     db_session.add(req1)
     db_session.add(req2)
@@ -808,17 +808,17 @@ async def test_read_samples_by_request_id(
     # test_user (ID: 1)가 수집한 시료 2개 생성 (req1에 연결)
     sample1 = lims_models.Sample(request_id=req1.id, sampling_point_id=test_sampling_point.id, sampling_date=date.today(),
                                  sample_type_id=test_sample_type.id, container_id=test_sample_container.id,
-                                 parameters_for_analysis={"A": True}, collector_user_id=test_user.id)  # test_user.id로 변경
+                                 parameters_for_analysis={"A": True}, collector_login_id=test_user.id)  # test_user.id로 변경
     sample2 = lims_models.Sample(request_id=req1.id, sampling_point_id=test_sampling_point.id, sampling_date=date.today(),
                                  sample_type_id=test_sample_type.id, container_id=test_sample_container.id,
-                                 parameters_for_analysis={"B": True}, collector_user_id=test_user.id)  # test_user.id로 변경
+                                 parameters_for_analysis={"B": True}, collector_login_id=test_user.id)  # test_user.id로 변경
     db_session.add(sample1)
     db_session.add(sample2)
 
     # 다른 사용자(test_sampler_user, ID: 2)가 수집한 시료 1개 생성 (req2에 연결)
     sample3 = lims_models.Sample(request_id=req2.id, sampling_point_id=test_sampling_point.id, sampling_date=date.today(),
                                  sample_type_id=test_sample_type.id, container_id=test_sample_container.id,
-                                 parameters_for_analysis={"C": True}, collector_user_id=test_sampler_user.id)  # test_sampler_user.id 유지
+                                 parameters_for_analysis={"C": True}, collector_login_id=test_sampler_user.id)  # test_sampler_user.id 유지
     db_session.add(sample3)
 
     await db_session.commit()
@@ -837,7 +837,7 @@ async def test_read_samples_by_request_id(
     # 따라서 예상되는 결과는 정확히 2개여야 합니다.
     assert len(samples_list) == 2
     assert all(s["request_id"] == req1.id for s in samples_list)
-    assert all(s["collector_user_id"] == test_user.id for s in samples_list)
+    assert all(s["collector_login_id"] == test_user.id for s in samples_list)
     assert any(s["parameters_for_analysis"] == {"A": True} for s in samples_list)
     assert any(s["parameters_for_analysis"] == {"B": True} for s in samples_list)
     assert not any(s["request_id"] == req2.id for s in samples_list)  # req2의 시료는 반환되지 않아야 합니다.
@@ -960,7 +960,7 @@ async def test_create_worksheet_data_success_user(
     data_data = {
         "worksheet_id": test_worksheet.id,
         "data_date": str(date.today()),
-        "analyst_user_id": test_analyst_user.id,
+        "analyst_login_id": test_analyst_user.id,
         "is_verified": False,
         "raw_data": {"CELL_A1": 7.5, "CELL_B1": "Pass"}
     }
@@ -969,7 +969,7 @@ async def test_create_worksheet_data_success_user(
     print(f"Response JSON: {response.json()}")
     assert response.status_code == 201
     assert response.json()["raw_data"] == data_data["raw_data"]
-    assert response.json()["analyst_user_id"] == test_analyst_user.id
+    assert response.json()["analyst_login_id"] == test_analyst_user.id
     print("test_create_worksheet_data_success_user passed.")
 
 
@@ -981,9 +981,9 @@ async def test_read_worksheet_data_filtered_by_worksheet_and_date(
     test_user: usr_models.User
 ):
     print("\n--- Running test_read_worksheet_data_filtered_by_worksheet_and_date ---")
-    ws_data1 = lims_schemas.WorksheetDataCreate(worksheet_id=test_worksheet.id, data_date=date.today(), analyst_user_id=test_user.id, raw_data={"a": 1})
-    ws_data2 = lims_schemas.WorksheetDataCreate(worksheet_id=test_worksheet.id, data_date=date.today() - timedelta(days=1), analyst_user_id=test_user.id, raw_data={"b": 2})
-    ws_data3 = lims_schemas.WorksheetDataCreate(worksheet_id=test_worksheet.id, data_date=date.today(), analyst_user_id=test_user.id, raw_data={"c": 3})
+    ws_data1 = lims_schemas.WorksheetDataCreate(worksheet_id=test_worksheet.id, data_date=date.today(), analyst_login_id=test_user.id, raw_data={"a": 1})
+    ws_data2 = lims_schemas.WorksheetDataCreate(worksheet_id=test_worksheet.id, data_date=date.today() - timedelta(days=1), analyst_login_id=test_user.id, raw_data={"b": 2})
+    ws_data3 = lims_schemas.WorksheetDataCreate(worksheet_id=test_worksheet.id, data_date=date.today(), analyst_login_id=test_user.id, raw_data={"c": 3})
 
     await worksheet_data_crud.create(db_session, obj_in=ws_data1)
     await worksheet_data_crud.create(db_session, obj_in=ws_data2)
@@ -998,7 +998,7 @@ async def test_read_worksheet_data_filtered_by_worksheet_and_date(
     assert len(data_list) == 2  # 정확히 2개여야 합니다.
     assert all(d["worksheet_id"] == test_worksheet.id for d in data_list)
     assert all(d["data_date"] == str(date.today()) for d in data_list)
-    assert all(d["analyst_user_id"] == test_user.id for d in data_list)  # 생성자가 test_user인지 확인
+    assert all(d["analyst_login_id"] == test_user.id for d in data_list)  # 생성자가 test_user인지 확인
     print("test_read_worksheet_data_filtered_by_worksheet_and_date passed.")
 
 
@@ -1016,7 +1016,7 @@ async def test_create_analysis_result_success_user(
     ws_data = await worksheet_data_crud.create(db_session, obj_in=lims_schemas.WorksheetDataCreate(
         worksheet_id=test_worksheet.id,
         data_date=date.today(),
-        analyst_user_id=test_analyst_user.id,
+        analyst_login_id=test_analyst_user.id,
         raw_data={"test_param": 10.0}
     ))
 
@@ -1028,7 +1028,7 @@ async def test_create_analysis_result_success_user(
         "result_value": 7.15,
         "unit": "pH",
         "analysis_date": str(date.today()),
-        "analyst_user_id": test_analyst_user.id,
+        "analyst_login_id": test_analyst_user.id,
         "is_approved": False
     }
     response = await authorized_client.post("/api/v1/lims/analysis_results", json=result_data)
@@ -1055,7 +1055,7 @@ async def test_aliquot_sample_fixture(
         request_date=date.today(),
         project_id=test_lims_project.id,
         department_id=test_department.id,
-        requester_user_id=test_sampler_user.id,
+        requester_login_id=test_sampler_user.id,
         title="Test request for aliquot",
         requested_parameters={}
     )
@@ -1071,7 +1071,7 @@ async def test_aliquot_sample_fixture(
         sample_type_id=test_sample_type.id,
         container_id=test_sample_container.id,
         parameters_for_analysis={},
-        collector_user_id=test_sampler_user.id
+        collector_login_id=test_sampler_user.id
     )
     db_session.add(test_sample)
     await db_session.commit()
@@ -1109,7 +1109,7 @@ async def test_create_test_request_template_success_user(
     print("\n--- Running test_create_test_request_template_success_user ---")
     template_data = {
         "name": "월간 수질 보고서 템플릿",
-        "user_id": test_analyst_user.id,
+        "login_id": test_analyst_user.id,
         "serialized_text": {"header": "월간 보고", "items": ["pH", "DO"]}
     }
     response = await authorized_client.post("/api/v1/lims/test_request_templates", json=template_data)
@@ -1117,7 +1117,7 @@ async def test_create_test_request_template_success_user(
     print(f"Response JSON: {response.json()}")
     assert response.status_code == 201
     assert response.json()["name"] == "월간 수질 보고서 템플릿"
-    assert response.json()["user_id"] == test_analyst_user.id
+    assert response.json()["login_id"] == test_analyst_user.id
     print("test_create_test_request_template_success_user passed.")
 
 
@@ -1137,26 +1137,26 @@ async def test_read_test_request_templates_filtered_by_user(
 
     # 1. test_user (로그인된 일반 사용자)가 생성한 템플릿
     template_by_test_user_1 = await test_request_template_crud.create(db_session, obj_in=lims_schemas.TestRequestTemplateCreate(
-        name="일반 사용자 템플릿 1", user_id=test_user.id, serialized_text={"key": "value1"}
-    ), current_user_id=test_user.id)
+        name="일반 사용자 템플릿 1", login_id=test_user.id, serialized_text={"key": "value1"}
+    ), current_login_id=test_user.id)
 
     template_by_test_user_2 = await test_request_template_crud.create(db_session, obj_in=lims_schemas.TestRequestTemplateCreate(
-        name="일반 사용자 템플릿 2", user_id=test_user.id, serialized_text={"key": "value2"}
-    ), current_user_id=test_user.id)
+        name="일반 사용자 템플릿 2", login_id=test_user.id, serialized_text={"key": "value2"}
+    ), current_login_id=test_user.id)
 
     # 2. test_analyst_user (다른 일반 사용자)가 생성한 템플릿
     template_by_analyst = await test_request_template_crud.create(db_session, obj_in=lims_schemas.TestRequestTemplateCreate(
-        name="분석가 템플릿 1 (다른 사용자)", user_id=test_analyst_user.id, serialized_text={"key": "value3"}
-    ), current_user_id=test_analyst_user.id)  # current_user_id도 해당 사용자의 ID로 전달
+        name="분석가 템플릿 1 (다른 사용자)", login_id=test_analyst_user.id, serialized_text={"key": "value3"}
+    ), current_login_id=test_analyst_user.id)  # current_login_id도 해당 사용자의 ID로 전달
 
     # 3. test_admin_user (관리자)가 생성한 템플릿
     template_by_admin = await test_request_template_crud.create(db_session, obj_in=lims_schemas.TestRequestTemplateCreate(
-        name="관리자 템플릿 1", user_id=test_admin_user.id, serialized_text={"key": "value4"}
-    ), current_user_id=test_admin_user.id)  # current_user_id도 해당 사용자의 ID로 전달
+        name="관리자 템플릿 1", login_id=test_admin_user.id, serialized_text={"key": "value4"}
+    ), current_login_id=test_admin_user.id)  # current_login_id도 해당 사용자의 ID로 전달
 
     # test_user (authorized_client)로 로그인하여 자신의 템플릿 조회
-    # user_id 필터를 test_user.id로 명시적으로 지정합니다.
-    response = await authorized_client.get(f"/api/v1/lims/test_request_templates?user_id={test_user.id}")
+    # login_id 필터를 test_user.id로 명시적으로 지정합니다.
+    response = await authorized_client.get(f"/api/v1/lims/test_request_templates?login_id={test_user.id}")
     print(f"Response status code: {response.status_code}")
     print(f"Response JSON: {response.json()}")
 
@@ -1165,7 +1165,7 @@ async def test_read_test_request_templates_filtered_by_user(
 
     # test_user가 생성한 템플릿 2개만 반환되어야 합니다.
     assert len(templates) == 2
-    assert all(t["user_id"] == test_user.id for t in templates)
+    assert all(t["login_id"] == test_user.id for t in templates)
     assert any(t["name"] == "일반 사용자 템플릿 1" for t in templates)
     assert any(t["name"] == "일반 사용자 템플릿 2" for t in templates)
 
@@ -1195,7 +1195,7 @@ async def test_create_pr_view_success_user(
 
     view_data = {
         "name": "내 맞춤형 보기",
-        "user_id": test_analyst_user.id,
+        "login_id": test_analyst_user.id,
         "plant_id": test_plant.id,
         "sampling_point_ids": [test_sampling_point.id],
         "parameter_ids": [param_ph.id],
@@ -1206,7 +1206,7 @@ async def test_create_pr_view_success_user(
     print(f"Response JSON: {response.json()}")
     assert response.status_code == 201
     assert response.json()["name"] == "내 맞춤형 보기"
-    assert response.json()["user_id"] == test_analyst_user.id
+    assert response.json()["login_id"] == test_analyst_user.id
     assert response.json()["plant_id"] == test_plant.id
     assert test_sampling_point.id in response.json()["sampling_point_ids"]
     assert param_ph.id in response.json()["parameter_ids"]
@@ -1268,7 +1268,7 @@ async def test_create_calibration_record_success_admin(
         "parameter_id": param.id,
         "calibration_date": datetime.now(UTC).isoformat(),
         "next_calibration_date": str(date.today() + timedelta(days=180)),
-        "calibrated_by_user_id": test_analyst_user.id,
+        "calibrated_by_login_id": test_analyst_user.id,
         "standard_sample_id": std_sample.id,
         "acceptance_criteria_met": True
     }
@@ -1299,7 +1299,7 @@ async def test_create_qc_sample_result_success_user(
         "expected_value": 0.0,
         "measured_value": 0.01,
         "analysis_date": str(date.today()),
-        "analyst_user_id": test_analyst_user.id,
+        "analyst_login_id": test_analyst_user.id,
         "passed_qc": True
     }
     response = await authorized_client.post("/api/v1/lims/qc_sample_results", json=qc_data)
@@ -1307,5 +1307,5 @@ async def test_create_qc_sample_result_success_user(
     print(f"Response JSON: {response.json()}")
     assert response.status_code == 201
     assert response.json()["qc_type"] == "Blank"
-    assert response.json()["analyst_user_id"] == test_analyst_user.id
+    assert response.json()["analyst_login_id"] == test_analyst_user.id
     print("test_create_qc_sample_result_success_user passed.")

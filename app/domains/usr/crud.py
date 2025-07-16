@@ -82,12 +82,12 @@ class CRUDUser(CRUDBase[usr_models.User, usr_schemas.UserCreate, usr_schemas.Use
     def __init__(self):
         super().__init__(model=usr_models.User)
 
-    async def get_by_user_id(self, db: AsyncSession, *, user_id: str) -> Optional[usr_models.User]:
+    async def get_by_login_id(self, db: AsyncSession, *, login_id: str) -> Optional[usr_models.User]:
         """사용자명으로 사용자를 조회합니다."""
-        # statement = select(self.model).where(self.model.user_id == username)
+        # statement = select(self.model).where(self.model.login_id == username)
         # result = await db.execute(statement)
         # return result.scalars().one_or_none()
-        return await self.get_by_attribute(db, attribute="user_id", value=user_id)
+        return await self.get_by_attribute(db, attribute="login_id", value=login_id)
 
     async def get_by_email(self, db: AsyncSession, *, email: str) -> Optional[usr_models.User]:
         """이메일로 사용자를 조회합니다."""
@@ -98,7 +98,7 @@ class CRUDUser(CRUDBase[usr_models.User, usr_schemas.UserCreate, usr_schemas.Use
 
     async def create(self, db: AsyncSession, *, obj_in: usr_schemas.UserCreate) -> usr_models.User:
         """새로운 사용자를 생성하며 비밀번호를 해싱하고 중복을 검사합니다."""
-        if await self.get_by_user_id(db, user_id=obj_in.user_id):
+        if await self.get_by_login_id(db, login_id=obj_in.login_id):
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Username already registered")
         if obj_in.email and await self.get_by_email(db, email=obj_in.email):
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already registered")
@@ -112,9 +112,9 @@ class CRUDUser(CRUDBase[usr_models.User, usr_schemas.UserCreate, usr_schemas.Use
         await db.refresh(db_user)
         return db_user
 
-    async def authenticate(self, db: AsyncSession, *, user_id: str, password: str) -> Optional[usr_models.User]:
+    async def authenticate(self, db: AsyncSession, *, login_id: str, password: str) -> Optional[usr_models.User]:
         """사용자명과 비밀번호를 사용하여 사용자를 인증합니다."""
-        user = await self.get_by_user_id(db, user_id=user_id)
+        user = await self.get_by_login_id(db, login_id=login_id)
         if not user:
             return None
         if not verify_password(password, user.password_hash):

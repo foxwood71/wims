@@ -5,10 +5,10 @@
 올바른 비동기 문법과 순환 참조를 회피하는 임포트 패턴을 사용합니다.
 """
 
-from typing import List, Optional, Dict, Any
-from datetime import date, datetime, UTC
+from typing import List, Optional  # , Dict, Any
+from datetime import date, datetime, timedelta, UTC
 
-from sqlmodel import select, SQLModel
+from sqlmodel import select  # , SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from fastapi import HTTPException, status
@@ -320,20 +320,54 @@ class CRUDTestRequest(CRUDBase[lims_models.TestRequest, lims_schemas.TestRequest
         result = await db.execute(statement)
         return result.scalars().one_or_none()
 
-    async def create(self, db: AsyncSession, *, obj_in: lims_schemas.TestRequestCreate, current_user_id: int) -> lims_models.TestRequest:
+    async def get_multi(
+        self,
+        db: AsyncSession,
+        *,
+        department_id: Optional[int] = None,  # 부서 ID 필터
+        start_date: Optional[date] = None,   # 시작일 필터
+        end_date: Optional[date] = None,     # 종료일 필터
+        skip: int = 0,
+        limit: int = 100
+    ) -> List[lims_models.TestRequest]:
+        """
+        시험 의뢰 다중 조회 (부서 및 의뢰 날짜 검색 기능 포함)
+        """
+        query = select(self.model)
+
+        # 1. 부서 ID 필터링
+        if department_id is not None:
+            query = query.where(self.model.department_id == department_id)
+
+        # 2. 시작일 필터링 (TestRequest 모델의 'request_date' 필드 사용)
+        if start_date is not None:
+            query = query.where(self.model.request_date >= start_date)
+
+        # 3. 종료일 필터링 (TestRequest 모델의 'request_date' 필드 사용)
+        if end_date is not None:
+            # end_date 당일까지 포함하기 위함
+            query = query.where(self.model.request_date < end_date + timedelta(days=1))
+
+        # 정렬 및 페이징
+        query = query.order_by(self.model.id.desc()).offset(skip).limit(limit)
+
+        result = await db.execute(query)
+        return result.scalars().all()
+
+    async def create(self, db: AsyncSession, *, obj_in: lims_schemas.TestRequestCreate, current_login_id: int) -> lims_models.TestRequest:
         """
         시험 의뢰를 생성합니다. 이 과정에서 다음을 수행합니다:
         - `request_date`가 없으면 오늘 날짜로 설정합니다.
-        - `requester_user_id`가 없으면 현재 사용자로 설정합니다.
+        - `requester_login_id`가 없으면 현재 사용자로 설정합니다.
         - 관련된 외래 키(FK)들이 유효한지 확인합니다.
         """
         # 1. request_date 기본값 설정 (사용자 제안)
         if obj_in.request_date is None:
             obj_in.request_date = date.today()
 
-        # 2. requester_user_id 기본값 설정 (기존 로직)
-        if obj_in.requester_user_id is None:
-            obj_in.requester_user_id = current_user_id
+        # 2. requester_login_id 기본값 설정 (기존 로직)
+        if obj_in.requester_login_id is None:
+            obj_in.requester_login_id = current_login_id
 
         # 3. 의뢰된 분석 항목 유효성 검사 (사용자 제안) [삭제] 각각의 sample에 분석항목을 기록
         #    (주의: requested_parameters의 key가 Parameter의 'code'라고 가정합니다.)
@@ -359,7 +393,7 @@ class CRUDTestRequest(CRUDBase[lims_models.TestRequest, lims_schemas.TestRequest
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found.")
         if not await department.get(db, id=obj_in.department_id):
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Department not found.")
-        if not await user.get(db, id=obj_in.requester_user_id):
+        if not await user.get(db, id=obj_in.requester_login_id):
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Requester user not found.")
 
         if obj_in.sampling_weather_id:
@@ -385,12 +419,12 @@ class CRUDTestRequest(CRUDBase[lims_models.TestRequest, lims_schemas.TestRequest
             if not await department.get(db, id=obj_in.department_id):
                 raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Department not found.")
 
-        if obj_in.requester_user_id is not None and obj_in.requester_user_id != db_obj.requester_user_id:
-            if not await user.get(db, id=obj_in.requester_user_id):
+        if obj_in.requester_login_id is not None and obj_in.requester_login_id != db_obj.requester_login_id:
+            if not await user.get(db, id=obj_in.requester_login_id):
                 raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Requester user not found.")
             # None으로 업데이트하는 경우
-            if obj_in.requester_user_id is None:
-                db_obj.requester_user_id = None
+            if obj_in.requester_login_id is None:
+                db_obj.requester_login_id = None
 
         if obj_in.sampling_weather_id is not None and obj_in.sampling_weather_id != db_obj.sampling_weather_id:
             if not await weather_condition.get(db, id=obj_in.sampling_weather_id):
@@ -450,8 +484,8 @@ class CRUDSample(CRUDBase[lims_models.Sample, lims_schemas.SampleCreate, lims_sc
         if obj_in.storage_location_id:
             if not await location.get(db, id=obj_in.storage_location_id):
                 raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Storage location not found.")
-        if obj_in.collector_user_id:
-            if not await user.get(db, id=obj_in.collector_user_id):
+        if obj_in.collector_login_id:
+            if not await user.get(db, id=obj_in.collector_login_id):
                 raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Collector user not found.")
 
         # collected_date 설정 (현재 날짜로)
@@ -508,12 +542,12 @@ class CRUDSample(CRUDBase[lims_models.Sample, lims_schemas.SampleCreate, lims_sc
                     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Storage location not found.")
             else:  # storage_location_id를 None으로 설정
                 db_obj.storage_location_id = None
-        if obj_in.collector_user_id is not None and obj_in.collector_user_id != db_obj.collector_user_id:
-            if obj_in.collector_user_id is not None:
-                if not await user.get(db, id=obj_in.collector_user_id):
+        if obj_in.collector_login_id is not None and obj_in.collector_login_id != db_obj.collector_login_id:
+            if obj_in.collector_login_id is not None:
+                if not await user.get(db, id=obj_in.collector_login_id):
                     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Collector user not found.")
-            else:  # collector_user_id를 None으로 설정
-                db_obj.collector_user_id = None
+            else:  # collector_login_id를 None으로 설정
+                db_obj.collector_login_id = None
 
         # sample_code는 보통 업데이트하지 않지만, schema에 있다면 처리
         if obj_in.sample_code is not None and obj_in.sample_code != db_obj.sample_code:
@@ -552,8 +586,8 @@ class CRUDAliquotSample(CRUDBase[lims_models.AliquotSample, lims_schemas.Aliquot
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Parameter not found.")
 
         # 선택적 FK 확인
-        if obj_in.analyst_user_id:
-            if not await user.get(db, id=obj_in.analyst_user_id):
+        if obj_in.analyst_login_id:
+            if not await user.get(db, id=obj_in.analyst_login_id):
                 raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Analyst user not found.")
 
         # aliquot_code는 DB 트리거에 의해 생성되므로, 여기서 중복 검사할 필요 없음
@@ -573,12 +607,12 @@ class CRUDAliquotSample(CRUDBase[lims_models.AliquotSample, lims_schemas.Aliquot
             if not await parameter.get(db, id=obj_in.parameter_id):
                 raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Parameter not found.")
 
-        if obj_in.analyst_user_id is not None and obj_in.analyst_user_id != db_obj.analyst_user_id:
-            if obj_in.analyst_user_id is not None:
-                if not await user.get(db, id=obj_in.analyst_user_id):
+        if obj_in.analyst_login_id is not None and obj_in.analyst_login_id != db_obj.analyst_login_id:
+            if obj_in.analyst_login_id is not None:
+                if not await user.get(db, id=obj_in.analyst_login_id):
                     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Analyst user not found.")
             else:
-                db_obj.analyst_user_id = None  # None으로 업데이트
+                db_obj.analyst_login_id = None  # None으로 업데이트
 
         if obj_in.aliquot_code is not None and obj_in.aliquot_code != db_obj.aliquot_code:
             existing_by_code = await self.get_by_aliquot_code(db, aliquot_code=obj_in.aliquot_code)
@@ -696,11 +730,11 @@ class CRUDWorksheetData(CRUDBase[lims_models.WorksheetData, lims_schemas.Workshe
         if not await worksheet.get(db, id=obj_in.worksheet_id):
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Worksheet not found.")
 
-        if obj_in.analyst_user_id:
-            if not await user.get(db, id=obj_in.analyst_user_id):
+        if obj_in.analyst_login_id:
+            if not await user.get(db, id=obj_in.analyst_login_id):
                 raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Analyst user not found.")
-        if obj_in.verified_by_user_id:
-            if not await user.get(db, id=obj_in.verified_by_user_id):
+        if obj_in.verified_by_login_id:
+            if not await user.get(db, id=obj_in.verified_by_login_id):
                 raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Verifier user not found.")
 
         # raw_data는 JSONB 타입이므로, 유효한 JSON 형식인지 Pydantic 스키마에서 검증됨
@@ -715,18 +749,18 @@ class CRUDWorksheetData(CRUDBase[lims_models.WorksheetData, lims_schemas.Workshe
             if not await worksheet.get(db, id=obj_in.worksheet_id):
                 raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Worksheet not found.")
 
-        if obj_in.analyst_user_id is not None and obj_in.analyst_user_id != db_obj.analyst_user_id:
-            if obj_in.analyst_user_id is not None:
-                if not await user.get(db, id=obj_in.analyst_user_id):
+        if obj_in.analyst_login_id is not None and obj_in.analyst_login_id != db_obj.analyst_login_id:
+            if obj_in.analyst_login_id is not None:
+                if not await user.get(db, id=obj_in.analyst_login_id):
                     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Analyst user not found.")
             else:
-                db_obj.analyst_user_id = None  # None으로 업데이트
-        if obj_in.verified_by_user_id is not None and obj_in.verified_by_user_id != db_obj.verified_by_user_id:
-            if obj_in.verified_by_user_id is not None:
-                if not await user.get(db, id=obj_in.verified_by_user_id):
+                db_obj.analyst_login_id = None  # None으로 업데이트
+        if obj_in.verified_by_login_id is not None and obj_in.verified_by_login_id != db_obj.verified_by_login_id:
+            if obj_in.verified_by_login_id is not None:
+                if not await user.get(db, id=obj_in.verified_by_login_id):
                     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Verifier user not found.")
             else:
-                db_obj.verified_by_user_id = None  # None으로 업데이트
+                db_obj.verified_by_login_id = None  # None으로 업데이트
 
         return await super().update(db, db_obj=db_obj, obj_in=obj_in)
 
@@ -766,11 +800,11 @@ class CRUDAnalysisResult(CRUDBase[lims_models.AnalysisResult, lims_schemas.Analy
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Worksheet data not found.")
 
         # 선택적 FK 확인
-        if obj_in.analyst_user_id:
-            if not await user.get(db, id=obj_in.analyst_user_id):
+        if obj_in.analyst_login_id:
+            if not await user.get(db, id=obj_in.analyst_login_id):
                 raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Analyst user not found.")
-        if obj_in.approved_by_user_id:
-            if not await user.get(db, id=obj_in.approved_by_user_id):
+        if obj_in.approved_by_login_id:
+            if not await user.get(db, id=obj_in.approved_by_login_id):
                 raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Approver user not found.")
 
         if await self.get_by_unique_constraint(db,
@@ -798,18 +832,18 @@ class CRUDAnalysisResult(CRUDBase[lims_models.AnalysisResult, lims_schemas.Analy
             if not await worksheet_data.get(db, id=obj_in.worksheet_data_id):
                 raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Worksheet data not found.")
 
-        if obj_in.analyst_user_id is not None and obj_in.analyst_user_id != db_obj.analyst_user_id:
-            if obj_in.analyst_user_id is not None:
-                if not await user.get(db, id=obj_in.analyst_user_id):
+        if obj_in.analyst_login_id is not None and obj_in.analyst_login_id != db_obj.analyst_login_id:
+            if obj_in.analyst_login_id is not None:
+                if not await user.get(db, id=obj_in.analyst_login_id):
                     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Analyst user not found.")
             else:
-                db_obj.analyst_user_id = None
-        if obj_in.approved_by_user_id is not None and obj_in.approved_by_user_id != db_obj.approved_by_user_id:
-            if obj_in.approved_by_user_id is not None:
-                if not await user.get(db, id=obj_in.approved_by_user_id):
+                db_obj.analyst_login_id = None
+        if obj_in.approved_by_login_id is not None and obj_in.approved_by_login_id != db_obj.approved_by_login_id:
+            if obj_in.approved_by_login_id is not None:
+                if not await user.get(db, id=obj_in.approved_by_login_id):
                     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Approver user not found.")
             else:
-                db_obj.approved_by_user_id = None
+                db_obj.approved_by_login_id = None
 
         # 복합 고유 키 변경 시 중복 확인
         if (obj_in.aliquot_sample_id is not None and obj_in.aliquot_sample_id != db_obj.aliquot_sample_id) or \
@@ -840,27 +874,27 @@ class CRUDTestRequestTemplate(CRUDBase[lims_models.TestRequestTemplate, lims_sch
     def __init__(self):
         super().__init__(model=lims_models.TestRequestTemplate)
 
-    async def get_by_name_and_user(self, db: AsyncSession, *, name: str, user_id: int) -> Optional[lims_models.TestRequestTemplate]:
+    async def get_by_name_and_user(self, db: AsyncSession, *, name: str, login_id: int) -> Optional[lims_models.TestRequestTemplate]:
         """템플릿 이름과 사용자 ID로 조회합니다."""
         statement = select(self.model).where(
             self.model.name == name,
-            self.model.user_id == user_id
+            self.model.login_id == login_id
         )
         result = await db.execute(statement)
         return result.scalars().one_or_none()
 
-    async def create(self, db: AsyncSession, *, obj_in: lims_schemas.TestRequestTemplateCreate, current_user_id: Optional[int] = None) -> lims_models.TestRequestTemplate:
+    async def create(self, db: AsyncSession, *, obj_in: lims_schemas.TestRequestTemplateCreate, current_login_id: Optional[int] = None) -> lims_models.TestRequestTemplate:
         """FK 유효성 및 이름-사용자 중복을 확인하고 생성합니다."""
         from app.domains.usr.crud import user
 
-        # user_id가 None이면 current_user_id로 설정 (라우터에서 처리 가능)
-        if obj_in.user_id is None and current_user_id is not None:
-            obj_in.user_id = current_user_id
+        # login_id가 None이면 current_login_id로 설정 (라우터에서 처리 가능)
+        if obj_in.login_id is None and current_login_id is not None:
+            obj_in.login_id = current_login_id
 
-        if not await user.get(db, id=obj_in.user_id):
+        if not await user.get(db, id=obj_in.login_id):
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
 
-        if await self.get_by_name_and_user(db, name=obj_in.name, user_id=obj_in.user_id):
+        if await self.get_by_name_and_user(db, name=obj_in.name, login_id=obj_in.login_id):
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Test request template with this name already exists for this user.")
 
         return await super().create(db, obj_in=obj_in)
@@ -869,19 +903,19 @@ class CRUDTestRequestTemplate(CRUDBase[lims_models.TestRequestTemplate, lims_sch
         """업데이트 시 FK 유효성 및 이름-사용자 중복 검사."""
         from app.domains.usr.crud import user
 
-        if obj_in.user_id is not None and obj_in.user_id != db_obj.user_id:
-            if not await user.get(db, id=obj_in.user_id):
+        if obj_in.login_id is not None and obj_in.login_id != db_obj.login_id:
+            if not await user.get(db, id=obj_in.login_id):
                 raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
             else:
-                db_obj.user_id = obj_in.user_id  # user_id 변경 가능하도록
+                db_obj.login_id = obj_in.login_id  # login_id 변경 가능하도록
 
         if (obj_in.name is not None and obj_in.name != db_obj.name) or \
-           (obj_in.user_id is not None and obj_in.user_id != db_obj.user_id):
+           (obj_in.login_id is not None and obj_in.login_id != db_obj.login_id):
 
             target_name = obj_in.name if obj_in.name is not None else db_obj.name
-            target_user_id = obj_in.user_id if obj_in.user_id is not None else db_obj.user_id
+            target_login_id = obj_in.login_id if obj_in.login_id is not None else db_obj.login_id
 
-            existing_template = await self.get_by_name_and_user(db, name=target_name, user_id=target_user_id)
+            existing_template = await self.get_by_name_and_user(db, name=target_name, login_id=target_login_id)
             if existing_template and existing_template.id != db_obj.id:
                 raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Test request template with this name already exists for the specified user.")
 
@@ -948,8 +982,8 @@ class CRUDCalibrationRecord(CRUDBase[lims_models.CalibrationRecord, lims_schemas
         if not await parameter.get(db, id=obj_in.parameter_id):
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Parameter not found.")
 
-        if obj_in.calibrated_by_user_id:
-            if not await user.get(db, id=obj_in.calibrated_by_user_id):
+        if obj_in.calibrated_by_login_id:
+            if not await user.get(db, id=obj_in.calibrated_by_login_id):
                 raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Calibrated by user not found.")
         if obj_in.standard_sample_id:
             if not await standard_sample.get(db, id=obj_in.standard_sample_id):
@@ -969,12 +1003,12 @@ class CRUDCalibrationRecord(CRUDBase[lims_models.CalibrationRecord, lims_schemas
             if not await parameter.get(db, id=obj_in.parameter_id):
                 raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Parameter not found.")
 
-        if obj_in.calibrated_by_user_id is not None and obj_in.calibrated_by_user_id != db_obj.calibrated_by_user_id:
-            if obj_in.calibrated_by_user_id is not None:
-                if not await user.get(db, id=obj_in.calibrated_by_user_id):
+        if obj_in.calibrated_by_login_id is not None and obj_in.calibrated_by_login_id != db_obj.calibrated_by_login_id:
+            if obj_in.calibrated_by_login_id is not None:
+                if not await user.get(db, id=obj_in.calibrated_by_login_id):
                     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Calibrated by user not found.")
             else:
-                db_obj.calibrated_by_user_id = None
+                db_obj.calibrated_by_login_id = None
         if obj_in.standard_sample_id is not None and obj_in.standard_sample_id != db_obj.standard_sample_id:
             if obj_in.standard_sample_id is not None:
                 if not await standard_sample.get(db, id=obj_in.standard_sample_id):
@@ -1004,7 +1038,7 @@ class CRUDQcSampleResult(CRUDBase[lims_models.QcSampleResult, lims_schemas.QcSam
                 raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Aliquot sample not found.")
         if not await parameter.get(db, id=obj_in.parameter_id):
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Parameter not found.")
-        if not await user.get(db, id=obj_in.analyst_user_id):
+        if not await user.get(db, id=obj_in.analyst_login_id):
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Analyst user not found.")
 
         return await super().create(db, obj_in=obj_in)
@@ -1022,8 +1056,8 @@ class CRUDQcSampleResult(CRUDBase[lims_models.QcSampleResult, lims_schemas.QcSam
         if obj_in.parameter_id is not None and obj_in.parameter_id != db_obj.parameter_id:
             if not await parameter.get(db, id=obj_in.parameter_id):
                 raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Parameter not found.")
-        if obj_in.analyst_user_id is not None and obj_in.analyst_user_id != db_obj.analyst_user_id:
-            if not await user.get(db, id=obj_in.analyst_user_id):
+        if obj_in.analyst_login_id is not None and obj_in.analyst_login_id != db_obj.analyst_login_id:
+            if not await user.get(db, id=obj_in.analyst_login_id):
                 raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Analyst user not found.")
 
         return await super().update(db, db_obj=db_obj, obj_in=obj_in)
@@ -1039,26 +1073,26 @@ class CRUDPrView(CRUDBase[lims_models.PrView, lims_schemas.PrViewCreate, lims_sc
     def __init__(self):
         super().__init__(model=lims_models.PrView)
 
-    async def get_by_name_and_user(self, db: AsyncSession, *, name: str, user_id: int) -> Optional[lims_models.PrView]:
+    async def get_by_name_and_user(self, db: AsyncSession, *, name: str, login_id: int) -> Optional[lims_models.PrView]:
         """보기 이름과 사용자 ID로 조회합니다."""
         statement = select(self.model).where(
             self.model.name == name,
-            self.model.user_id == user_id
+            self.model.login_id == login_id
         )
         result = await db.execute(statement)
         return result.scalars().one_or_none()
 
-    async def create(self, db: AsyncSession, *, obj_in: lims_schemas.PrViewCreate, current_user_id: Optional[int] = None) -> lims_models.PrView:
+    async def create(self, db: AsyncSession, *, obj_in: lims_schemas.PrViewCreate, current_login_id: Optional[int] = None) -> lims_models.PrView:
         """FK 유효성 및 이름-사용자 중복을 확인하고 생성합니다. (N+1 문제 해결)"""
         from app.domains.usr.crud import user
         from app.domains.loc.crud import facility as loc_facility_crud
         from app.domains.lims.crud import sampling_point, parameter
 
-        if obj_in.user_id is None and current_user_id is not None:
-            obj_in.user_id = current_user_id
+        if obj_in.login_id is None and current_login_id is not None:
+            obj_in.login_id = current_login_id
 
         # --- 필수 FK 확인 ---
-        if not await user.get(db, id=obj_in.user_id):
+        if not await user.get(db, id=obj_in.login_id):
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
         if not await loc_facility_crud.get(db, id=obj_in.facility_id):
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Facility not found for primary facility_id.")
@@ -1082,7 +1116,7 @@ class CRUDPrView(CRUDBase[lims_models.PrView, lims_schemas.PrViewCreate, lims_sc
         await validate_ids(obj_in.parameter_ids, parameter, "Parameter")
         # --- 유효성 검사 로직 종료 ---
 
-        if await self.get_by_name_and_user(db, name=obj_in.name, user_id=obj_in.user_id):
+        if await self.get_by_name_and_user(db, name=obj_in.name, login_id=obj_in.login_id):
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="PR view with this name already exists for this user.")
 
         return await super().create(db, obj_in=obj_in)
@@ -1092,11 +1126,11 @@ class CRUDPrView(CRUDBase[lims_models.PrView, lims_schemas.PrViewCreate, lims_sc
         from app.domains.usr.crud import user
         from app.domains.loc.crud import wastewater_plant as loc_plant_crud
 
-        if obj_in.user_id is not None and obj_in.user_id != db_obj.user_id:
-            if not await user.get(db, id=obj_in.user_id):
+        if obj_in.login_id is not None and obj_in.login_id != db_obj.login_id:
+            if not await user.get(db, id=obj_in.login_id):
                 raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
             else:
-                db_obj.user_id = obj_in.user_id  # user_id 변경 가능하도록
+                db_obj.login_id = obj_in.login_id  # login_id 변경 가능하도록
 
         if obj_in.facility_id is not None and obj_in.facility_id != db_obj.facility_id:
             if not await loc_plant_crud.get(db, id=obj_in.facility_id):
@@ -1128,12 +1162,12 @@ class CRUDPrView(CRUDBase[lims_models.PrView, lims_schemas.PrViewCreate, lims_sc
             obj_in.parameter_ids = None
 
         if (obj_in.name is not None and obj_in.name != db_obj.name) or \
-           (obj_in.user_id is not None and obj_in.user_id != db_obj.user_id):
+           (obj_in.login_id is not None and obj_in.login_id != db_obj.login_id):
 
             target_name = obj_in.name if obj_in.name is not None else db_obj.name
-            target_user_id = obj_in.user_id if obj_in.user_id is not None else db_obj.user_id
+            target_login_id = obj_in.login_id if obj_in.login_id is not None else db_obj.login_id
 
-            existing_view = await self.get_by_name_and_user(db, name=target_name, user_id=target_user_id)
+            existing_view = await self.get_by_name_and_user(db, name=target_name, login_id=target_login_id)
             if existing_view and existing_view.id != db_obj.id:
                 raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="PR view with this name already exists for the specified user.")
 

@@ -4,9 +4,9 @@
 'lims' 도메인 (실험실 정보 관리 시스템 및 QA/QC) 관련 API 엔드포인트를 정의하는 모듈입니다.
 """
 from typing import List, Optional
-
+from datetime import date
 from sqlmodel.ext.asyncio.session import AsyncSession
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
 
 # 중앙 의존성 관리 모듈 임포트
 from app.core import dependencies as deps
@@ -388,18 +388,52 @@ async def create_test_request(
     db: AsyncSession = Depends(deps.get_db_session),
     current_user: usr_models.User = Depends(deps.get_current_active_user),
 ):
-    return await lims_crud.test_request.create(db, obj_in=request_in, current_user_id=current_user.id)
+    return await lims_crud.test_request.create(db, obj_in=request_in, current_login_id=current_user.id)
 
 
-@router.get("/test_requests", response_model=List[lims_schemas.TestRequestResponse], summary="모든 시험 의뢰 조회")
+@router.get(
+    "/test_requests",
+    response_model=List[lims_schemas.TestRequestResponse],
+    summary="모든 시험 의뢰 조회"
+)
 async def read_test_requests(
     db: AsyncSession = Depends(deps.get_db_session),
     current_user: usr_models.User = Depends(deps.get_current_active_user),
-    skip: int = 0, limit: int = 100,
+    skip: int = 0,
+    limit: int = 100,
+    department_id: Optional[int] = Query(default=None, description="부서 ID (관리자/분석가용)"),
+    start_date: date | None = Query(default=None, description="검색 시작일 (YYYY-MM-DD)"),
+    end_date: date | None = Query(default=None, description="검색 종료일 (YYYY-MM-DD)")
 ):
-    if current_user.role <= usr_models.UserRole.LAB_ANALYST:  # 수질분석자 이상
-        return await lims_crud.test_request.get_multi(db, skip=skip, limit=limit)
-    return await lims_crud.test_request.get_multi(db, requester_user_id=current_user.id, skip=skip, limit=limit)
+    """
+    시험 의뢰 목록을 조회합니다.
+
+    - **department_id**: 특정 부서 ID로 필터링 (관리자/분석가 권한 필요)
+    - **start_date**: 검색 시작일
+    - **end_date**: 검색 종료일
+    """
+    # CRUD 함수에 전달할 파라미터를 딕셔너리로 구성
+    crud_params = {
+        "skip": skip,
+        "limit": limit,
+        "department_id": None,
+        "start_date": start_date,
+        "end_date": end_date,
+    }
+
+    # 권한에 따라 department_id 처리
+    if current_user.role <= usr_models.UserRole.LAB_ANALYST:  # 수질분석자 이상 (관리자급)
+        # 관리자급 사용자는 쿼리로 받은 department_id를 필터 조건으로 사용
+        # 만약 department_id가 제공되지 않으면(None), 전체 부서 조회
+        if department_id is not None:
+            crud_params["department_id"] = department_id
+    else:
+        # 일반 사용자는 자신의 부서 데이터만 볼 수 있도록 강제
+        # 쿼리로 department_id를 보내더라도 무시하고 자신의 부서 ID를 사용
+        crud_params["department_id"] = current_user.department_id
+
+    # 구성된 파라미터를 CRUD 함수에 한 번에 전달
+    return await lims_crud.test_request.get_multi(db, **crud_params)
 
 
 @router.get("/test_requests/{request_id}", response_model=lims_schemas.TestRequestResponse, summary="특정 시험 의뢰 조회")
@@ -411,7 +445,7 @@ async def read_test_request(
     db_obj = await lims_crud.test_request.get(db, id=request_id)
     if not db_obj:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="TestRequest not found")
-    if current_user.role > 10 and db_obj.requester_user_id != current_user.id:
+    if current_user.role > 10 and db_obj.requester_login_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not enough permissions")
     return db_obj
 
@@ -426,7 +460,7 @@ async def update_test_request(
     db_obj = await lims_crud.test_request.get(db, id=request_id)
     if not db_obj:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="TestRequest not found")
-    if current_user.role > 10 and db_obj.requester_user_id != current_user.id:
+    if current_user.role > 10 and db_obj.requester_login_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not enough permissions")
     return await lims_crud.test_request.update(db, db_obj=db_obj, obj_in=request_in)
 
@@ -464,7 +498,7 @@ async def read_samples(
 ):
     if current_user.role <= 10:
         return await lims_crud.sample.get_multi(db, skip=skip, limit=limit)
-    return await lims_crud.sample.get_multi(db, collector_user_id=current_user.id, skip=skip, limit=limit)
+    return await lims_crud.sample.get_multi(db, collector_login_id=current_user.id, skip=skip, limit=limit)
 
 
 @router.get("/samples/{sample_id}", response_model=lims_schemas.SampleResponse, summary="특정 원 시료 조회")
@@ -476,7 +510,7 @@ async def read_sample(
     db_obj = await lims_crud.sample.get(db, id=sample_id)
     if not db_obj:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sample not found")
-    if current_user.role > 10 and db_obj.collector_user_id != current_user.id:
+    if current_user.role > 10 and db_obj.collector_login_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not enough permissions")
     return db_obj
 
@@ -516,8 +550,8 @@ async def create_aliquot_sample(
     db: AsyncSession = Depends(deps.get_db_session),
     current_user: usr_models.User = Depends(deps.get_current_active_user),
 ):
-    if not aliquot_in.analyst_user_id:
-        aliquot_in.analyst_user_id = current_user.id
+    if not aliquot_in.analyst_login_id:
+        aliquot_in.analyst_login_id = current_user.id
     return await lims_crud.aliquot_sample.create(db, obj_in=aliquot_in)
 
 
@@ -529,7 +563,7 @@ async def read_aliquot_samples(
 ):
     if current_user.role <= 10:
         return await lims_crud.aliquot_sample.get_multi(db, skip=skip, limit=limit)
-    return await lims_crud.aliquot_sample.get_multi(db, analyst_user_id=current_user.id, skip=skip, limit=limit)
+    return await lims_crud.aliquot_sample.get_multi(db, analyst_login_id=current_user.id, skip=skip, limit=limit)
 
 
 @router.get("/aliquot_samples/{aliquot_sample_id}", response_model=lims_schemas.AliquotSampleResponse, summary="특정 분할 시료 조회")
@@ -541,7 +575,7 @@ async def read_aliquot_sample(
     db_obj = await lims_crud.aliquot_sample.get(db, id=aliquot_sample_id)
     if not db_obj:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="AliquotSample not found")
-    if current_user.role > 10 and db_obj.analyst_user_id != current_user.id:
+    if current_user.role > 10 and db_obj.analyst_login_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not enough permissions")
     return db_obj
 
@@ -747,8 +781,8 @@ async def create_worksheet_data(
     db: AsyncSession = Depends(deps.get_db_session),
     current_user: usr_models.User = Depends(deps.get_current_active_user),
 ):
-    if not data_in.analyst_user_id:
-        data_in.analyst_user_id = current_user.id
+    if not data_in.analyst_login_id:
+        data_in.analyst_login_id = current_user.id
     return await lims_crud.worksheet_data.create(db, obj_in=data_in)
 
 
@@ -804,8 +838,8 @@ async def create_analysis_result(
     db: AsyncSession = Depends(deps.get_db_session),
     current_user: usr_models.User = Depends(deps.get_current_active_user),
 ):
-    if not result_in.analyst_user_id:
-        result_in.analyst_user_id = current_user.id
+    if not result_in.analyst_login_id:
+        result_in.analyst_login_id = current_user.id
     return await lims_crud.analysis_result.create(db, obj_in=result_in)
 
 
@@ -861,7 +895,7 @@ async def create_test_request_template(
     db: AsyncSession = Depends(deps.get_db_session),
     current_user: usr_models.User = Depends(deps.get_current_active_user),
 ):
-    return await lims_crud.test_request_template.create(db, obj_in=template_in, current_user_id=current_user.id)
+    return await lims_crud.test_request_template.create(db, obj_in=template_in, current_login_id=current_user.id)
 
 
 @router.get("/test_request_templates", response_model=List[lims_schemas.TestRequestTemplateResponse], summary="사용자의 모든 시험 의뢰 템플릿 조회")
@@ -872,7 +906,7 @@ async def read_test_request_templates(
 ):
     if current_user.role <= 10:
         return await lims_crud.test_request_template.get_multi(db, skip=skip, limit=limit)
-    return await lims_crud.test_request_template.get_multi(db, user_id=current_user.id, skip=skip, limit=limit)
+    return await lims_crud.test_request_template.get_multi(db, login_id=current_user.id, skip=skip, limit=limit)
 
 
 @router.get("/test_request_templates/{template_id}", response_model=lims_schemas.TestRequestTemplateResponse, summary="특정 시험 의뢰 템플릿 조회")
@@ -884,7 +918,7 @@ async def read_test_request_template(
     db_obj = await lims_crud.test_request_template.get(db, id=template_id)
     if not db_obj:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="TestRequestTemplate not found")
-    if current_user.role > 10 and db_obj.user_id != current_user.id:
+    if current_user.role > 10 and db_obj.login_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not enough permissions")
     return db_obj
 
@@ -899,7 +933,7 @@ async def update_test_request_template(
     db_obj = await lims_crud.test_request_template.get(db, id=template_id)
     if not db_obj:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="TestRequestTemplate not found")
-    if current_user.role > 10 and db_obj.user_id != current_user.id:
+    if current_user.role > 10 and db_obj.login_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not enough permissions")
     return await lims_crud.test_request_template.update(db, db_obj=db_obj, obj_in=template_in)
 
@@ -913,7 +947,7 @@ async def delete_test_request_template(
     db_obj = await lims_crud.test_request_template.get(db, id=template_id)
     if not db_obj:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="TestRequestTemplate not found")
-    if current_user.role > 10 and db_obj.user_id != current_user.id:
+    if current_user.role > 10 and db_obj.login_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not enough permissions")
     await lims_crud.test_request_template.delete(db, id=template_id)
     return
@@ -983,8 +1017,8 @@ async def create_calibration_record(
     db: AsyncSession = Depends(deps.get_db_session),
     current_user: usr_models.User = Depends(deps.get_current_active_user),
 ):
-    if not record_in.calibrated_by_user_id:
-        record_in.calibrated_by_user_id = current_user.id
+    if not record_in.calibrated_by_login_id:
+        record_in.calibrated_by_login_id = current_user.id
     return await lims_crud.calibration_record.create(db, obj_in=record_in)
 
 
@@ -1040,8 +1074,8 @@ async def create_qc_sample_result(
     db: AsyncSession = Depends(deps.get_db_session),
     current_user: usr_models.User = Depends(deps.get_current_active_user),
 ):
-    if not result_in.analyst_user_id:
-        result_in.analyst_user_id = current_user.id
+    if not result_in.analyst_login_id:
+        result_in.analyst_login_id = current_user.id
     return await lims_crud.qc_sample_result.create(db, obj_in=result_in)
 
 
@@ -1097,7 +1131,7 @@ async def create_pr_view(
     db: AsyncSession = Depends(deps.get_db_session),
     current_user: usr_models.User = Depends(deps.get_current_active_user),
 ):
-    return await lims_crud.pr_view.create(db, obj_in=view_in, current_user_id=current_user.id)
+    return await lims_crud.pr_view.create(db, obj_in=view_in, current_login_id=current_user.id)
 
 
 @router.get("/pr_views", response_model=List[lims_schemas.PrViewResponse], summary="사용자의 모든 정의 보기 조회")
@@ -1108,7 +1142,7 @@ async def read_pr_views(
 ):
     if current_user.role <= 10:
         return await lims_crud.pr_view.get_multi(db, skip=skip, limit=limit)
-    return await lims_crud.pr_view.get_multi(db, user_id=current_user.id, skip=skip, limit=limit)
+    return await lims_crud.pr_view.get_multi(db, login_id=current_user.id, skip=skip, limit=limit)
 
 
 @router.get("/pr_views/{pr_view_id}", response_model=lims_schemas.PrViewResponse, summary="특정 사용자 정의 보기 조회")
@@ -1120,7 +1154,7 @@ async def read_pr_view(
     db_obj = await lims_crud.pr_view.get(db, id=pr_view_id)
     if not db_obj:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="PrView not found")
-    if current_user.role > 10 and db_obj.user_id != current_user.id:
+    if current_user.role > 10 and db_obj.login_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not enough permissions")
     return db_obj
 
@@ -1135,7 +1169,7 @@ async def update_pr_view(
     db_obj = await lims_crud.pr_view.get(db, id=pr_view_id)
     if not db_obj:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="PrView not found")
-    if current_user.role > 10 and db_obj.user_id != current_user.id:
+    if current_user.role > 10 and db_obj.login_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not enough permissions")
     return await lims_crud.pr_view.update(db, db_obj=db_obj, obj_in=view_in)
 
@@ -1149,7 +1183,7 @@ async def delete_pr_view(
     db_obj = await lims_crud.pr_view.get(db, id=pr_view_id)
     if not db_obj:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="PrView not found")
-    if current_user.role > 10 and db_obj.user_id != current_user.id:
+    if current_user.role > 10 and db_obj.login_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not enough permissions")
     await lims_crud.pr_view.delete(db, id=pr_view_id)
     return

@@ -220,21 +220,21 @@ class CRUDOpsView(
         super().__init__(model=ops_models.OpsView)
 
     async def get_by_name_and_user(
-        self, db: AsyncSession, *, name: str, user_id: int
+        self, db: AsyncSession, *, name: str, login_id: int
     ) -> Optional[ops_models.OpsView]:
         """이름과 사용자 ID로 뷰를 조회합니다."""
         statement = select(self.model).where(
             self.model.name == name,
-            self.model.user_id == user_id
+            self.model.login_id == login_id
         )
         result = await db.execute(statement)
         return result.scalars().one_or_none()
 
     async def get_views_by_user(
-        self, db: AsyncSession, *, user_id: int, skip: int = 0, limit: int = 100
+        self, db: AsyncSession, *, login_id: int, skip: int = 0, limit: int = 100
     ) -> List[ops_models.OpsView]:
         """특정 사용자 ID로 뷰 목록을 조회합니다."""
-        query = select(self.model).where(self.model.user_id == user_id)
+        query = select(self.model).where(self.model.login_id == login_id)
         query = query.offset(skip).limit(limit).order_by(self.model.name)
         result = await db.execute(query)
         return result.scalars().all()
@@ -265,7 +265,7 @@ class CRUDOpsView(
         from app.domains.usr.crud import user
         from app.domains.loc.crud import wastewater_plant
 
-        if not await user.get(db, id=obj_in.user_id):
+        if not await user.get(db, id=obj_in.login_id):
             raise HTTPException(status_code=404, detail="User not found.")
 
         # obj_in.plant_id에 대한 유효성 검사 (init.sql에 따라 필수)

@@ -47,7 +47,7 @@ class DepartmentRead(DepartmentBase):
 # =============================================================================
 class UserBase(SQLModel):
     """사용자 정보의 기본 필드를 정의하는 스키마"""
-    user_id: str = Field(..., max_length=50)
+    login_id: str = Field(..., max_length=50)
     email: Optional[EmailStr] = Field(None, max_length=100)
     name: Optional[str] = Field(None, max_length=100)
     department_id: Optional[int] = None

@@ -161,7 +161,7 @@ def get_password_hash_fixture():
 #   user_factory를 호출하여 사용자 이름, 해시된 비밀번호, 역할 등을 가진 사용자 데이터를 만듭니다.
 #   생성된 사용자를 DB에 저장(commit)합니다.
 # 목적:
-#   다른 데이터를 생성할 때 외래 키(Foreign Key) 값으로 사용하기 위해 (예: requester_user_id=test_user.id).
+#   다른 데이터를 생성할 때 외래 키(Foreign Key) 값으로 사용하기 위해 (예: requester_login_id=test_user.id).
 #   API 호출 후, 응답 값과 DB에 저장된 사용자의 정보(이메일, 역할 등)를 직접 비교할 때.
 #   사용자 정보 수정 같은 CRUD 로직을 테스트할 때.
 # --- 부서 픽스처 추가 ---
@@ -192,7 +192,7 @@ def user_factory(db_session: AsyncSession) -> Callable[..., Awaitable[usr_models
     **kwargs를 User 모델 생성자에 전달하도록 수정되었습니다.
     """
     async def _create_user(
-        user_id: str,
+        login_id: str,
         password: str,
         role: usr_models.UserRole,
         department_id: int,
@@ -200,9 +200,9 @@ def user_factory(db_session: AsyncSession) -> Callable[..., Awaitable[usr_models
         **kwargs,
     ) -> usr_models.User:
         user_data = {
-            "user_id": user_id,
+            "login_id": login_id,
             "password_hash": get_password_hash(password),
-            "email": f"{user_id}@example.com",
+            "email": f"{login_id}@example.com",
             "role": role,
             "department_id": department_id,
             "is_active": is_active,
@@ -305,10 +305,10 @@ async def test_dep_a_user_b(user_factory: Callable, test_department_a: usr_model
 
 
 @pytest_asyncio.fixture(scope="function")
-async def test_dep_b_user_a(user_factory: Callable, test_department_b: usr_models.Department) -> usr_models.User:
+async def test_dep_b_user_c(user_factory: Callable, test_department_b: usr_models.Department) -> usr_models.User:
     """일반 사용자(GENERAL_USER)를 생성합니다."""
     return await user_factory(
-        "testuser_a", "testpass123",
+        "testuser_c", "testpass123",
         role=usr_models.UserRole.GENERAL_USER,
         department_id=test_department_b.id,
         notes="General Test User"
@@ -316,10 +316,10 @@ async def test_dep_b_user_a(user_factory: Callable, test_department_b: usr_model
 
 
 @pytest_asyncio.fixture(scope="function")
-async def test_dep_b_user_b(user_factory: Callable, test_department_b: usr_models.Department) -> usr_models.User:
+async def test_dep_b_user_d(user_factory: Callable, test_department_b: usr_models.Department) -> usr_models.User:
     """일반 사용자(GENERAL_USER)를 생성합니다."""
     return await user_factory(
-        "testuser_b", "testpass123",
+        "testuser_d", "testpass123",
         role=usr_models.UserRole.GENERAL_USER,
         department_id=test_department_b.id,
         notes="General Test User"
@@ -372,11 +372,11 @@ def authorized_client_factory(
     #             # OAuth2PasswordRequestForm을 계속 사용한다면 data=,
     #             # Pydantic 모델을 사용한다면 json=을 사용해야 합니다.
     #             # 현재 라우터는 OAuth2PasswordRequestForm을 사용하므로 data=가 맞습니다.
-    #             login_data = {"username": user.user_id, "password": password}
+    #             login_data = {"username": user.login_id, "password": password}
     #             res = await client.post("/api/v1/usr/auth/token", data=login_data)
 
     #             if res.status_code != 200:
-    #                 pytest.fail(f"Login failed for {user.user_id}: {res.text}")
+    #                 pytest.fail(f"Login failed for {user.login_id}: {res.text}")
 
     #             token = res.json()["access_token"]
     #             client.headers["Authorization"] = f"Bearer {token}"
@@ -412,11 +412,11 @@ def authorized_client_factory(
 
             transport = ASGITransport(app=main_app)
             async with AsyncClient(transport=transport, base_url="http://test") as client:
-                login_data = {"username": user.user_id, "password": password}
+                login_data = {"username": user.login_id, "password": password}
                 res = await client.post("/api/v1/usr/auth/token", data=login_data)
 
                 if res.status_code != 200:
-                    pytest.fail(f"Login failed for {user.user_id}: {res.text}")
+                    pytest.fail(f"Login failed for {user.login_id}: {res.text}")
 
                 token = res.json()["access_token"]
                 client.headers["Authorization"] = f"Bearer {token}"
@@ -478,7 +478,7 @@ async def admin_client(
 
 #         transport = ASGITransport(app=main_app)
 #         async with AsyncClient(transport=transport, base_url="http://test") as client:
-#             login_data = {"username": test_admin_user.user_id, "password": "sysadmpass123"}
+#             login_data = {"username": test_admin_user.login_id, "password": "sysadmpass123"}
 #             res = await client.post("/api/v1/usr/auth/token", data=login_data)
 #             assert res.status_code == 200, f"Admin login failed: {res.text}"
 #             token = res.json()["access_token"]
@@ -548,7 +548,7 @@ async def authorized_client(
 #         yield db_session
 
 #     def override_get_current_user():
-#         print(f"DEBUG: override_get_current_user returning user: {test_user.user_id}, role: {test_user.role.value}")
+#         print(f"DEBUG: override_get_current_user returning user: {test_user.login_id}, role: {test_user.role.value}")
 #         return test_user
 
 #     original_overrides = main_app.dependency_overrides.copy()  # 원본 오버라이드 저장
@@ -563,7 +563,7 @@ async def authorized_client(
 
 #         transport = ASGITransport(app=main_app)
 #         async with AsyncClient(transport=transport, base_url="http://test") as client:
-#             login_data = {"username": test_user.user_id, "password": "testpass123"}
+#             login_data = {"username": test_user.login_id, "password": "testpass123"}
 #             res = await client.post("/api/v1/usr/auth/token", data=login_data)
 #             assert res.status_code == 200, f"User login failed: {res.text}"
 #             token = res.json()["access_token"]

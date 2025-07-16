@@ -394,15 +394,15 @@ async def test_create_or_update_equipment_spec_success_admin(
 
 @pytest.mark.asyncio
 async def test_create_equipment_history_success_user(
-    authorized_client: TestClient,  # 일반 사용자 권한 (performed_by_user_id는 자동 설정)
+    authorized_client: TestClient,  # 일반 사용자 권한 (performed_by_login_id는 자동 설정)
     db_session: Session,
     fms_test_plant: loc_models.facility,  # FK
     fms_test_vendor: ven_models.Vendor,  # FK
-    test_user: usr_models.User  # performed_by_user_id
+    test_user: usr_models.User  # performed_by_login_id
 ):
     """
     일반 사용자 권한으로 새로운 설비 이력 기록을 성공적으로 생성하는지 테스트합니다.
-    `performed_by_user_id`가 자동으로 현재 사용자로 설정되는지 검증합니다.
+    `performed_by_login_id`가 자동으로 현재 사용자로 설정되는지 검증합니다.
     """
     print("\n--- Running test_create_equipment_history_success_user ---")
     eq_cat = fms_models.EquipmentCategory(name="이력 테스트 카테고리")
@@ -420,8 +420,8 @@ async def test_create_equipment_history_success_user(
         "change_type": "MAINTENANCE",
         "description": "월간 정기 점검",
         "service_provider_vendor_id": fms_test_vendor.id,
-        # performed_by_user_id를 명시적으로 설정하지 않아도 현재 사용자로 채워지는지 확인
-        # "performed_by_user_id": test_user.id
+        # performed_by_login_id를 명시적으로 설정하지 않아도 현재 사용자로 채워지는지 확인
+        # "performed_by_login_id": test_user.id
         "next_service_date": str(date(2025, 7, 1))
     }
     response = await authorized_client.post("/api/v1/fms/equipment_history", json=history_data)
@@ -432,7 +432,7 @@ async def test_create_equipment_history_success_user(
     created_history = response.json()
     assert created_history["equipment_id"] == equipment.id
     assert created_history["change_type"] == history_data["change_type"]
-    assert created_history["performed_by_user_id"] == test_user.id  # 자동 설정 확인
+    assert created_history["performed_by_login_id"] == test_user.id  # 자동 설정 확인
     assert "id" in created_history
     print("test_create_equipment_history_success_user passed.")
 

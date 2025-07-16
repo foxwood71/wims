@@ -12,6 +12,7 @@
 import pytest
 import pytest_asyncio
 from datetime import date, datetime, timedelta, UTC
+from dateutil.relativedelta import relativedelta
 from httpx import AsyncClient
 
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -78,7 +79,7 @@ async def test_test_request_fixture(
         request_date=date.today(),
         project_id=test_lims_project.id,
         department_id=test_department_a.id,
-        requester_user_id=test_user.id,
+        requester_login_id=test_user.id,
         title="일반 테스트 의뢰",
         requested_parameters={"pH": True, "BOD": True},
     )
@@ -159,7 +160,7 @@ async def test_sample_fixture(
         sample_type_id=test_sample_type.id,
         container_id=test_sample_container.id,
         parameters_for_analysis={"TN": True, "TP": True},
-        collector_user_id=test_user.id,
+        collector_login_id=test_user.id,
     )
     db_session.add(sample)
     await db_session.commit()
@@ -201,7 +202,7 @@ async def test_aliquot_sample_fixture(
         request_date=date.today(),
         project_id=test_lims_project.id,
         department_id=test_department_a.id,
-        requester_user_id=test_sampler_user.id,
+        requester_login_id=test_sampler_user.id,
         title="Test request for aliquot",
         requested_parameters={},
         sampling_weather_id=test_weather_condition.id,  # 추가: sampling_weather_id 설정
@@ -218,7 +219,7 @@ async def test_aliquot_sample_fixture(
         sample_type_id=test_sample_type.id,
         container_id=test_sample_container.id,
         parameters_for_analysis={},
-        collector_user_id=test_sampler_user.id,  # 추가: collector_user_id 설정
+        collector_login_id=test_sampler_user.id,  # 추가: collector_login_id 설정
     )
     db_session.add(test_sample)
     await db_session.commit()
@@ -237,7 +238,7 @@ async def test_aliquot_sample_fixture(
         parent_sample_id=test_sample.id,
         parameter_id=test_param.id,
         analysis_status="Pending",
-        analyst_user_id=test_sampler_user.id,  # 추가: analyst_user_id 설정
+        analyst_login_id=test_sampler_user.id,  # 추가: analyst_login_id 설정
     )
     db_session.add(aliquot)
     await db_session.commit()
@@ -280,7 +281,7 @@ async def test_worksheet_data_fixture(
     data = lims_models.WorksheetData(
         worksheet_id=test_worksheet.id,
         data_date=date.today(),
-        analyst_user_id=test_analyst_user.id,
+        analyst_login_id=test_analyst_user.id,
         raw_data={"key1": "value1", "key2": 123},
         is_verified=False,
     )
@@ -306,7 +307,7 @@ async def test_analysis_result_fixture(
         result_value=7.2,
         unit="pH",
         analysis_date=date.today(),
-        analyst_user_id=test_analyst_user.id,
+        analyst_login_id=test_analyst_user.id,
         is_approved=False,
     )
     db_session.add(result)
@@ -319,7 +320,7 @@ async def test_analysis_result_fixture(
 async def test_test_request_template_fixture(db_session: AsyncSession, test_user: usr_models.User) -> lims_models.TestRequestTemplate:
     template = lims_models.TestRequestTemplate(
         name="General Template",
-        user_id=test_user.id,
+        login_id=test_user.id,
         serialized_text={"project": "Default", "parameters": ["pH", "DO"]},
     )
     db_session.add(template)
@@ -334,7 +335,7 @@ async def test_pr_view_fixture(
 ) -> lims_models.PrView:
     pr_view = lims_models.PrView(
         name="My Custom View",
-        user_id=test_user.id,
+        login_id=test_user.id,
         plant_id=test_facility.id,
         sampling_point_ids=[],  # 더미 ID 대신 빈 리스트 또는 실제 유효한 ID
         parameter_ids=[],  # 더미 ID 대신 빈 리스트 또는 실제 유효한 ID
@@ -384,7 +385,7 @@ async def test_calibration_record_fixture(
         parameter_id=param_id,
         calibration_date=datetime.now(UTC),
         next_calibration_date=date.today() + timedelta(days=90),
-        calibrated_by_user_id=test_user.id,
+        calibrated_by_login_id=test_user.id,
         standard_sample_id=test_standard_sample.id,
         acceptance_criteria_met=True,
     )
@@ -411,7 +412,7 @@ async def test_qc_sample_result_fixture(
         acceptance_criteria={},
         passed_qc=True,
         analysis_date=date.today(),
-        analyst_user_id=test_user.id,
+        analyst_login_id=test_user.id,
     )
     db_session.add(qc_result)
     await db_session.commit()
@@ -690,10 +691,10 @@ async def test_delete_project_and_cascade_to_test_request(
         request_date=date.today(),
         project_id=test_lims_project.id,
         department_id=test_department_a.id,
-        requester_user_id=test_user.id,
+        requester_login_id=test_user.id,
         title="삭제될 프로젝트의 의뢰",
         requested_parameters={}
-    ), current_user_id=test_user.id)
+    ), current_login_id=test_user.id)
     req_id = req_to_delete.id
 
     delete_response = await admin_client.delete(f"/api/v1/lims/projects/{test_lims_project.id}")
@@ -806,7 +807,7 @@ async def test_read_sampling_points_with_filter(
 
 
 @pytest.mark.asyncio
-async def test_create_test_request_with_auto_user_id(
+async def test_create_test_request_with_auto_login_id(
     authorized_client: AsyncClient,
     test_lims_project: lims_models.Project,
     test_department_a: usr_models.Department,
@@ -814,9 +815,9 @@ async def test_create_test_request_with_auto_user_id(
     # test_parameter_condition_model: lims_models.Parameter  # prarameter (분석항목 생성)
 ):
     """
-    [성공/로직] requester_user_id 없이 시험 의뢰 생성 시, 현재 로그인된 사용자로 자동 할당되는지 테스트합니다.
+    [성공/로직] requester_login_id 없이 시험 의뢰 생성 시, 현재 로그인된 사용자로 자동 할당되는지 테스트합니다.
     """
-    print("\n--- Running test_create_test_request_with_auto_user_id ---")
+    print("\n--- Running test_create_test_request_with_auto_login_id ---")
     request_data = {
         "request_date": str(date.today()),
         "project_id": test_lims_project.id,
@@ -828,7 +829,7 @@ async def test_create_test_request_with_auto_user_id(
     assert response.status_code == 201
     created_request = response.json()
     print(f"\n test request code: {created_request["request_code"]}")
-    assert created_request["requester_user_id"] == test_user.id
+    assert created_request["requester_login_id"] == test_user.id
 
 
 # #  [신규] TestRequest 생성 시 유효성 검사 실패 테스트 추가 [삭제] 분석코드는 각각의 sample에 부여하기에 삭제
@@ -856,15 +857,17 @@ async def test_create_test_request_with_auto_user_id(
 
 @pytest.mark.asyncio
 async def test_user_can_only_read_requests_from_own_department(
-    authorized_client: AsyncClient,  # test_user로 로그인된 클라이언트 부서A
     db_session: AsyncSession,
+    lab_analyst_client: AsyncClient,
+    authorized_client: AsyncClient,  # test_user로 로그인된 클라이언트 부서A
+    test_department_a: usr_models.Department,
+    test_department_b: usr_models.Department,
+    test_lab_analyst: usr_models.Department,
     test_dep_a_user_a: usr_models.User,
     test_dep_a_user_b: usr_models.User,
-    test_dep_b_user_a: usr_models.User,
-    test_dep_b_user_b: usr_models.User,
+    test_dep_b_user_c: usr_models.User,
+    test_dep_b_user_d: usr_models.User,
     test_lims_project: lims_models.Project,
-    test_department_a: usr_models.Department,
-    test_department_b: usr_models.Department
 ):
     """
     [성공/권한] 일반 사용자가 자신의 부서에 속한 시험 의뢰 목록만 조회할 수 있는지 테스트합니다.
@@ -873,34 +876,34 @@ async def test_user_can_only_read_requests_from_own_department(
     """
     print("\n--- Running test_read_own_test_requests_as_user ---")
 
-    # 1. 내 의뢰 (test_dep_a_user_a가  자신의 부서(A)에 생성)
+    # 1. 부서별 의뢰생성
     await lims_crud.test_request.create(db_session, obj_in=lims_schemas.TestRequestCreate(
-        request_date=date.today(),
+        request_date=date.today() - relativedelta(month=1),
         project_id=test_lims_project.id,
         department_id=test_dep_a_user_a.department_id,
         title="부서A 사용자A 의뢰",
-    ), current_user_id=test_dep_a_user_a.id)
+    ), current_login_id=test_dep_a_user_a.id)
 
     await lims_crud.test_request.create(db_session, obj_in=lims_schemas.TestRequestCreate(
-        request_date=date.today(),
+        request_date=date.today() - relativedelta(month=1),
         project_id=test_lims_project.id,
-        department_id=test_dep_a_user_a.department_id,
+        department_id=test_dep_a_user_b.department_id,
         title="부서A 사용자B 의뢰",
-    ), current_user_id=test_dep_a_user_b.id)
+    ), current_login_id=test_dep_a_user_b.id)
 
     await lims_crud.test_request.create(db_session, obj_in=lims_schemas.TestRequestCreate(
         request_date=date.today(),
         project_id=test_lims_project.id,
-        department_id=test_dep_b_user_a.department_id,
-        title="부서B 사용자A 의뢰",
-    ), current_user_id=test_dep_b_user_a.id)
+        department_id=test_dep_b_user_c.department_id,
+        title="부서B 사용자C 의뢰",
+    ), current_login_id=test_dep_b_user_c.id)
 
     await lims_crud.test_request.create(db_session, obj_in=lims_schemas.TestRequestCreate(
         request_date=date.today(),
         project_id=test_lims_project.id,
-        department_id=test_dep_b_user_b.department_id,
-        title="부서B 사용자B 의뢰",
-    ), current_user_id=test_dep_b_user_b.id)
+        department_id=test_dep_b_user_d.department_id,
+        title="부서B 사용자D 의뢰",
+    ), current_login_id=test_dep_b_user_d.id)
 
     await db_session.commit()
 
@@ -914,6 +917,13 @@ async def test_user_can_only_read_requests_from_own_department(
     # 반환된 의뢰들의 제목을 집합(set)으로 만들어 순서에 상관없이 검증
     returned_titles = {req["title"] for req in requests}
     assert "부서B" not in returned_titles
+
+    response = await lab_analyst_client.get("/api/v1/lims/test_requests")
+    assert response.status_code == 200
+    requests = response.json()
+
+    # 전체 의뢰 4개 보여야 함
+    assert len(requests) == 4
 
     print("--- Test successful: User can see all requests from their department and not from others. ---")
 
@@ -938,7 +948,7 @@ async def test_read_other_user_test_request_forbidden(
         department_id=test_department_a.id,
         title="다른 사람 의뢰",
         requested_parameters={}
-    ), current_user_id=test_admin_user.id)
+    ), current_login_id=test_admin_user.id)
 
     #  일반 사용자(authorized_client)로 다른 사용자의 의뢰를 ID로 조회합니다.
     response = await authorized_client.get(f"/api/v1/lims/test_requests/{other_user_request.id}")
@@ -969,7 +979,7 @@ async def test_delete_test_request_and_cascade_to_samples(
         sample_type_id=test_sample_type.id,
         container_id=test_sample_container.id,
         parameters_for_analysis={"Test": True},
-        collector_user_id=test_user.id,
+        collector_login_id=test_user.id,
     ))
     sample_id = sample_to_delete.id
 
@@ -1005,7 +1015,7 @@ async def test_create_sample_success(
         "sample_type_id": test_sample_type.id,
         "container_id": test_sample_container.id,
         "parameters_for_analysis": {"TN": True, "TP": True},
-        "collector_user_id": test_user.id,
+        "collector_login_id": test_user.id,
     }
     response = await authorized_client.post("/api/v1/lims/samples", json=sample_data)
     assert response.status_code == 201
@@ -1034,7 +1044,7 @@ async def test_create_sample_nonexistent_request_id(
         "sample_type_id": test_sample_type.id,
         "container_id": test_sample_container.id,
         "parameters_for_analysis": {"TN": True, "TP": True},
-        "collector_user_id": test_user.id,
+        "collector_login_id": test_user.id,
     }
     response = await authorized_client.post("/api/v1/lims/samples", json=sample_data)
     assert response.status_code == 404
@@ -1087,7 +1097,7 @@ async def test_delete_sample_and_cascade_to_aliquot(
     aliquot_to_delete = await lims_crud.aliquot_sample.create(db_session, obj_in=lims_schemas.AliquotSampleCreate(
         parent_sample_id=test_sample.id,
         parameter_id=test_parameter.id,
-        analyst_user_id=test_user.id
+        analyst_login_id=test_user.id
     ))
     aliquot_id = aliquot_to_delete.id
 
@@ -1117,7 +1127,7 @@ async def test_create_aliquot_sample_success(
     aliquot_data = {
         "parent_sample_id": test_sample.id,
         "parameter_id": test_parameter.id,
-        "analyst_user_id": test_user.id
+        "analyst_login_id": test_user.id
     }
     response = await authorized_client.post("/api/v1/lims/aliquot_samples", json=aliquot_data)
     assert response.status_code == 201
@@ -1161,10 +1171,10 @@ async def test_update_aliquot_sample_status_triggers_parent_update(
 
     #  두 개의 분할 시료 생성
     aliquot1 = await lims_crud.aliquot_sample.create(db_session, obj_in=lims_schemas.AliquotSampleCreate(
-        parent_sample_id=test_sample.id, parameter_id=param1.id, analyst_user_id=test_user.id
+        parent_sample_id=test_sample.id, parameter_id=param1.id, analyst_login_id=test_user.id
     ))
     aliquot2 = await lims_crud.aliquot_sample.create(db_session, obj_in=lims_schemas.AliquotSampleCreate(
-        parent_sample_id=test_sample.id, parameter_id=param2.id, analyst_user_id=test_user.id
+        parent_sample_id=test_sample.id, parameter_id=param2.id, analyst_login_id=test_user.id
     ))
     await db_session.refresh(test_sample)
     assert test_sample.analysis_status == 'Pending'  # 초기 상태
@@ -1214,7 +1224,7 @@ async def test_create_analysis_result_duplicate_error(
         "result_value": 9.99,
         "unit": "mg/L",
         "analysis_date": str(date.today()),
-        "analyst_user_id": test_analysis_result.analyst_user_id,
+        "analyst_login_id": test_analysis_result.analyst_login_id,
     }
     response = await authorized_client.post("/api/v1/lims/analysis_results", json=duplicate_data)
     assert response.status_code == 400
@@ -1467,7 +1477,7 @@ class TestPrView:
         assert response.status_code == 201
         created_view = response.json()
         assert created_view["name"] == "나의 첫번째 보기"
-        assert created_view["user_id"] == test_user.id
+        assert created_view["login_id"] == test_user.id
         assert created_view["parameter_ids"] == [test_parameter.id]
 
     async def test_create_pr_view_with_invalid_fk(
@@ -1491,9 +1501,9 @@ class TestPrView:
         #  다른 사용자(admin)의 보기 설정 생성
         other_user_view = await lims_crud.pr_view.create(db_session, obj_in=lims_schemas.PrViewCreate(
             name="관리자용 보기",
-            user_id=test_admin_user.id,
+            login_id=test_admin_user.id,
             facility_id=test_facility.id
-        ), current_user_id=test_admin_user.id)
+        ), current_login_id=test_admin_user.id)
 
         #  1. 다른 사람의 보기 ID로 직접 조회 시도 -> 실패 (403)
         response_get = await authorized_client.get(f"/api/v1/lims/pr_views/{other_user_view.id}")

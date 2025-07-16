@@ -568,7 +568,7 @@ async def test_create_ops_view_success_user(
 
     view_data = {
         "name": "내 맞춤 보기",
-        "user_id": test_user.id,
+        "login_id": test_user.id,
         "plant_id": plant.id,
         "plant_ids": [plant.id],
         "memo": "자주 보는 데이터 모음"
@@ -581,7 +581,7 @@ async def test_create_ops_view_success_user(
     assert response.status_code == 201
     created_view = response.json()
     assert created_view["name"] == view_data["name"]
-    assert created_view["user_id"] == test_user.id
+    assert created_view["login_id"] == test_user.id
     assert created_view["plant_ids"] == [plant.id]
     assert "id" in created_view
     print("test_create_ops_view_success_user passed.")
@@ -602,14 +602,14 @@ async def test_create_ops_view_duplicate_name_for_user(
     await db_session.commit()
     await db_session.refresh(plant)
 
-    existing_view = ops_models.OpsView(name="기존 보기", user_id=test_user.id, plant_ids=[plant.id])
+    existing_view = ops_models.OpsView(name="기존 보기", login_id=test_user.id, plant_ids=[plant.id])
     db_session.add(existing_view)
     await db_session.commit()
     await db_session.refresh(existing_view)
 
     view_data = {
         "name": "기존 보기",  # 중복 이름
-        "user_id": test_user.id,
+        "login_id": test_user.id,
         "plant_id": plant.id,
         "plant_ids": [plant.id]
     }
@@ -623,7 +623,7 @@ async def test_create_ops_view_duplicate_name_for_user(
 
 
 @pytest.mark.asyncio
-async def test_read_ops_views_by_user_id(
+async def test_read_ops_views_by_login_id(
     client: TestClient,
     test_user: UsrUser,
     test_admin_user: UsrUser,
@@ -632,7 +632,7 @@ async def test_read_ops_views_by_user_id(
     """
     특정 사용자 ID로 사용자 정의 운영 데이터 보기 목록을 성공적으로 조회하는지 테스트합니다.
     """
-    print("\n--- Running test_read_ops_views_by_user_id ---")
+    print("\n--- Running test_read_ops_views_by_login_id ---")
     plant1 = loc_models.facility(code="VW_P1", name="보기용 플랜트1")
     plant2 = loc_models.facility(code="VW_P2", name="보기용 플랜트2")
     db_session.add(plant1)
@@ -642,9 +642,9 @@ async def test_read_ops_views_by_user_id(
     await db_session.refresh(plant2)
 
      # ops_models.OpsView 객체 생성 시 plant_id 필드 추가
-    view_user1_a = ops_models.OpsView(name="뷰1", user_id=test_user.id, plant_id=plant1.id, plant_ids=[plant1.id])
-    view_user1_b = ops_models.OpsView(name="뷰2", user_id=test_user.id, plant_id=plant2.id, plant_ids=[plant2.id])
-    view_admin1 = ops_models.OpsView(name="관리자뷰", user_id=test_admin_user.id, plant_id=plant1.id, plant_ids=[plant1.id])
+    view_user1_a = ops_models.OpsView(name="뷰1", login_id=test_user.id, plant_id=plant1.id, plant_ids=[plant1.id])
+    view_user1_b = ops_models.OpsView(name="뷰2", login_id=test_user.id, plant_id=plant2.id, plant_ids=[plant2.id])
+    view_admin1 = ops_models.OpsView(name="관리자뷰", login_id=test_admin_user.id, plant_id=plant1.id, plant_ids=[plant1.id])
     db_session.add(view_user1_a)
     db_session.add(view_user1_b)
     db_session.add(view_admin1)
@@ -653,17 +653,17 @@ async def test_read_ops_views_by_user_id(
     await db_session.refresh(view_user1_b)
     await db_session.refresh(view_admin1)
 
-    response = await client.get(f"/api/v1/ops/views?user_id={test_user.id}")
+    response = await client.get(f"/api/v1/ops/views?login_id={test_user.id}")
     print(f"Response status code: {response.status_code}")
     print(f"Response JSON: {response.json()}")
 
     assert response.status_code == 200
     views_list = response.json()
     assert len(views_list) == 2
-    assert all(v["user_id"] == test_user.id for v in views_list)
+    assert all(v["login_id"] == test_user.id for v in views_list)
     assert any(v["name"] == "뷰1" for v in views_list)
     assert any(v["name"] == "뷰2" for v in views_list)
-    print("test_read_ops_views_by_user_id passed.")
+    print("test_read_ops_views_by_login_id passed.")
 
 
 @pytest.mark.asyncio
@@ -685,9 +685,9 @@ async def test_read_ops_views_by_plant_id(
     await db_session.refresh(plant_b)
 
     # 뷰 생성
-    view_plant_a = ops_models.OpsView(name="A 플랜트 뷰", user_id=test_user.id, plant_id=plant_a.id, plant_ids=[plant_a.id])
-    view_plant_b = ops_models.OpsView(name="B 플랜트 뷰", user_id=test_user.id, plant_id=plant_b.id, plant_ids=[plant_b.id])
-    view_plant_ab = ops_models.OpsView(name="AB 플랜트 뷰", user_id=test_user.id, plant_id=plant_a.id, plant_ids=[plant_a.id, plant_b.id])
+    view_plant_a = ops_models.OpsView(name="A 플랜트 뷰", login_id=test_user.id, plant_id=plant_a.id, plant_ids=[plant_a.id])
+    view_plant_b = ops_models.OpsView(name="B 플랜트 뷰", login_id=test_user.id, plant_id=plant_b.id, plant_ids=[plant_b.id])
+    view_plant_ab = ops_models.OpsView(name="AB 플랜트 뷰", login_id=test_user.id, plant_id=plant_a.id, plant_ids=[plant_a.id, plant_b.id])
     db_session.add(view_plant_a)
     db_session.add(view_plant_b)
     db_session.add(view_plant_ab)
@@ -724,7 +724,7 @@ async def test_update_ops_view_success_user_self(
     await db_session.commit()
     await db_session.refresh(plant)
 
-    view_to_update = ops_models.OpsView(name="업데이트 대상 보기", user_id=test_user.id, plant_id=plant.id, plant_ids=[plant.id])
+    view_to_update = ops_models.OpsView(name="업데이트 대상 보기", login_id=test_user.id, plant_id=plant.id, plant_ids=[plant.id])
     db_session.add(view_to_update)
     await db_session.commit()
     await db_session.refresh(view_to_update)
@@ -757,7 +757,7 @@ async def test_delete_ops_view_success_user_self(
     await db_session.commit()
     await db_session.refresh(plant)
 
-    view_to_delete = ops_models.OpsView(name="삭제 대상 보기", user_id=test_user.id, plant_id=plant.id, plant_ids=[plant.id])
+    view_to_delete = ops_models.OpsView(name="삭제 대상 보기", login_id=test_user.id, plant_id=plant.id, plant_ids=[plant.id])
     db_session.add(view_to_delete)
     await db_session.commit()
     await db_session.refresh(view_to_delete)

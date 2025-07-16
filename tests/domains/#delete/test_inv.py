@@ -390,7 +390,7 @@ async def test_create_material_transaction_usage_fifo_success(
     db_session: Session,
     inv_test_plant: loc_models.facility,
     inv_test_vendor: ven_models.Vendor,
-    test_user: usr_models.User  # performed_by_user_id
+    test_user: usr_models.User  # performed_by_login_id
 ):
     """
     'USAGE' 타입의 자재 거래 생성 시 FIFO 방식으로 재고가 성공적으로 차감되는지 테스트합니다.
@@ -438,7 +438,7 @@ async def test_create_material_transaction_usage_fifo_success(
         "plant_id": inv_test_plant.id,
         "transaction_type": "USAGE",
         "quantity_change": float(-usage_qty),  # 사용은 음수로
-        "performed_by_user_id": test_user.id
+        "performed_by_login_id": test_user.id
     }
     response = await authorized_client.post("/api/v1/inv/material_transactions", json=transaction_data)
     print(f"Response status code: {response.status_code}")
@@ -509,7 +509,7 @@ async def test_create_material_transaction_usage_insufficient_stock(
         "plant_id": inv_test_plant.id,
         "transaction_type": "USAGE",
         "quantity_change": -usage_qty,
-        "performed_by_user_id": test_user.id
+        "performed_by_login_id": test_user.id
     }
     response = await authorized_client.post("/api/v1/inv/material_transactions", json=transaction_data)
     print(f"Response status code: {response.status_code}")

@@ -249,7 +249,7 @@ async def test_upload_image_success_user(
     assert uploaded_image["file_path"].endswith(uploaded_image["file_name"])  # 경로에 파일명 포함
     assert uploaded_image["file_size_kb"] == 1  # 15바이트 / 1024 = 0 (정수 나눗셈)
     assert uploaded_image["mime_type"] == "image/png"
-    assert uploaded_image["uploaded_by_user_id"] == test_user.id
+    assert uploaded_image["uploaded_by_login_id"] == test_user.id
     assert uploaded_image["image_type_id"] == img_type.id
     assert "id" in uploaded_image
 
@@ -292,7 +292,7 @@ async def test_delete_image_success_admin(
         size=len(test_content) // 1024,
         content_type="text/plain",
         description="삭제될 이미지",
-        uploaded_by_user_id=test_user.id,
+        uploaded_by_login_id=test_user.id,
         uploaded_at=datetime.now()
     )
     db_session.add(image_data)

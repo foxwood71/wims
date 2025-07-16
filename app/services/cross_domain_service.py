@@ -42,14 +42,14 @@ class CrossDomainService:
         self.inv_crud = inv_crud
 
     async def process_sample_analysis_completion(
-        self, aliquot_sample_id: int, analyst_user_id: int, reagent_material_id: Optional[int] = None, quantity_used: Optional[float] = None
+        self, aliquot_sample_id: int, analyst_login_id: int, reagent_material_id: Optional[int] = None, quantity_used: Optional[float] = None
     ) -> lims_models.AliquotSample:
         """
         분할 시료의 분석 완료를 처리하고, 필요한 경우 사용된 시약을 재고에서 차감합니다.
 
         Args:
             aliquot_sample_id (int): 분석이 완료된 분할 시료의 ID.
-            analyst_user_id (int): 분석을 완료한 사용자의 ID.
+            analyst_login_id (int): 분석을 완료한 사용자의 ID.
             reagent_material_id (Optional[int]): 사용된 시약(자재)의 ID.
             quantity_used (Optional[float]): 사용된 시약의 수량.
 
@@ -69,7 +69,7 @@ class CrossDomainService:
         # 여기서는 편의상 모델 직접 수정 예시
         aliquot_sample.analysis_status = "Completed"
         aliquot_sample.analysis_date = datetime.now().date()
-        aliquot_sample.analyst_user_id = analyst_user_id
+        aliquot_sample.analyst_login_id = analyst_login_id
 
         # SQLModel 업데이트 로직 (CRUD를 통해)
         updated_aliquot_sample = await self.lims_crud.aliquot_sample.update_aliquot_sample(
@@ -78,7 +78,7 @@ class CrossDomainService:
             lims_models.AliquotSampleUpdate(
                 analysis_status="Completed",
                 analysis_date=datetime.now().date(),
-                analyst_user_id=analyst_user_id
+                analyst_login_id=analyst_login_id
             )
         )
         if not updated_aliquot_sample:
@@ -102,7 +102,7 @@ class CrossDomainService:
             # `inv_crud.material_transaction`에 FIFO 로직이 구현되어 있어야 합니다.
             # 여기서는 간단히 트랜잭션만 생성하는 예시를 보여줍니다.
             plant_id_for_transaction = 1 # 예시: 트랜잭션이 발생하는 처리장 ID. 실제로는 aliquot_sample.plant_id 등을 사용
-            user_who_performed = await self.lims_crud.user.get_user(self.db, analyst_user_id) # CRUD에서 사용자 조회
+            user_who_performed = await self.lims_crud.user.get_user(self.db, analyst_login_id) # CRUD에서 사용자 조회
             if not user_who_performed:
                 raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Analyst user not found for transaction logging.")
 
@@ -116,7 +116,7 @@ class CrossDomainService:
                         transaction_type="USAGE",
                         quantity_change=-quantity_used, # 사용이므로 음수
                         transaction_date=datetime.now(timezone.utc),
-                        performed_by_user_id=analyst_user_id,
+                        performed_by_login_id=analyst_login_id,
                         notes=f"LIMS analysis completion for aliquot_sample_id: {aliquot_sample_id}"
                     )
                 )
@@ -171,7 +171,7 @@ def get_cross_domain_service(
 #     """
 #     updated_aliquot = await cross_service.process_sample_analysis_completion(
 #         aliquot_sample_id=aliquot_id,
-#         analyst_user_id=current_user.id,
+#         analyst_login_id=current_user.id,
 #         reagent_material_id=reagent_material_id,
 #         quantity_used=quantity_used
 #     )
