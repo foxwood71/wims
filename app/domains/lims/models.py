@@ -244,7 +244,7 @@ class TestRequest(SQLModel, table=True):
     project: "Project" = Relationship(back_populates="test_requests")
     department: "Department" = Relationship(back_populates="test_requests")
     requester_user: "User" = Relationship(back_populates="test_requests_created")
-    # sampling_weather: Optional["WeatherCondition"] = Relationship(back_populates="test_requests")
+    sampling_weather: Optional["WeatherCondition"] = Relationship(back_populates="test_requests")
     samples: List["Sample"] = Relationship(
         back_populates="request", sa_relationship_kwargs={'cascade': 'all, delete-orphan'}
     )
@@ -298,7 +298,7 @@ class Sample(SQLModel, table=True):
     sampling_point: "SamplingPoint" = Relationship(back_populates="samples")
     sample_type: "SampleType" = Relationship(back_populates="samples")
     container: "SampleContainer" = Relationship(back_populates="samples")
-    sampling_weather: Optional["WeatherCondition"] = Relationship(back_populates="samples")
+    # sampling_weather: Optional["WeatherCondition"] = Relationship(back_populates="samples")
     storage_location: Optional["Location"] = Relationship(back_populates="samples")
     aliquot_samples: List["AliquotSample"] = Relationship(
         back_populates="parent_sample", sa_relationship_kwargs={'cascade': 'all, delete-orphan'}

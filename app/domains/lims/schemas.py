@@ -246,7 +246,7 @@ class TestRequestCreate(TestRequestBase):
     # 라우터에서 현재 로그인한 사용자로 자동 할당합니다.
     requester_user_id: Optional[int] = PydanticField(default=None, description="의뢰 사용자 ID (FK)")
     # <<< 수정된 부분 끝 >>>
-    request_code: Optional[str] = None  # 생성 시에는 클라이언트에서 제공하지 않음
+    # request_code: Optional[str] = None  # 생성 시에는 클라이언트에서 제공하지 않음 [제거] 각각의 sample에서 분석항목 기록
 
 
 class TestRequestUpdate(BaseModel):  # 업데이트는 모두 Optional

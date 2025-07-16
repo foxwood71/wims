@@ -6,9 +6,9 @@ import asyncio
 from logging.config import fileConfig
 
 from alembic import context
-from alembic_utils.replaceable_entity import register_entities
+from alembic_utils.replaceable_entity import register_entities  # noqa: F401, E402
 
-from sqlalchemy import pool, text, inspect
+from sqlalchemy import pool, text  # , inspect
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 from sqlmodel import SQLModel
 
@@ -52,8 +52,8 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 # ⭐️ Alembic-utils에 우리가 정의한 모든 함수/트리거 객체를 등록합니다.
-# 처음 - 코멘트 후 실행 : 테이블 우선생성
-# 2회차 이후 - 코멘트 제거 실행
+# ⭐️ 1회차 - 코멘트 후 실행 : 테이블 우선생성
+# ⭐️ 2회차 이후 - 코멘트 제거 실행
 # register_entities(all_db_objects)
 
 # target_metadata는 autogenerate 지원을 위해 SQLModel의 메타데이터를 사용합니다.

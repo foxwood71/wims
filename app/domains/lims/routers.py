@@ -397,7 +397,7 @@ async def read_test_requests(
     current_user: usr_models.User = Depends(deps.get_current_active_user),
     skip: int = 0, limit: int = 100,
 ):
-    if current_user.role <= 10:  # 관리자
+    if current_user.role <= usr_models.UserRole.LAB_ANALYST:  # 수질분석자 이상
         return await lims_crud.test_request.get_multi(db, skip=skip, limit=limit)
     return await lims_crud.test_request.get_multi(db, requester_user_id=current_user.id, skip=skip, limit=limit)
 

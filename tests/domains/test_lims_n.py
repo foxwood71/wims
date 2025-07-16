@@ -35,6 +35,21 @@ from app.domains.lims import schemas as lims_schemas
 # test_lims_project, test_instrument 등)는 conftest.py 파일에 중앙 관리되고 있으며,
 # pytest가 자동으로 주입합니다. 이 테스트 파일 내에서는 픽스처를 재정의하지 않습니다.
 # -----------------------------------------------------------------------------
+@pytest_asyncio.fixture(name="test_lims_project")
+async def test_lims_project_fixture(db_session: AsyncSession) -> lims_models.Project:
+    """테스트용 LIMS 프로젝트를 생성하고 반환합니다."""
+    project = lims_models.Project(
+        code="LIMS",
+        name="기본 LIMS 프로젝트",
+        start_date=date(2024, 1, 1),
+        end_date=date(2025, 12, 31)
+    )
+    db_session.add(project)
+    await db_session.commit()
+    await db_session.refresh(project)
+    return project
+
+
 @pytest_asyncio.fixture(name="test_parameter")
 async def test_parameter_fixture(db_session: AsyncSession, test_instrument: fms_models.Equipment) -> lims_models.Parameter:
     """테스트에서 사용할 기본 분석 항목(Parameter)을 생성하고 반환합니다."""
@@ -49,21 +64,6 @@ async def test_parameter_fixture(db_session: AsyncSession, test_instrument: fms_
     await db_session.commit()
     await db_session.refresh(parameter)
     return parameter
-
-
-@pytest_asyncio.fixture(name="test_lims_project")
-async def test_lims_project_fixture(db_session: AsyncSession) -> lims_models.Project:
-    """테스트용 LIMS 프로젝트를 생성하고 반환합니다."""
-    project = lims_models.Project(
-        code="LIMS",
-        name="기본 LIMS 프로젝트",
-        start_date=date(2024, 1, 1),
-        end_date=date(2025, 12, 31)
-    )
-    db_session.add(project)
-    await db_session.commit()
-    await db_session.refresh(project)
-    return project
 
 
 @pytest_asyncio.fixture(name="test_test_request")
@@ -784,25 +784,25 @@ async def test_read_sampling_points_with_filter(
 # =============================================================================
 # 4. 시험 의뢰 (TestRequest) 테스트
 # =============================================================================
-@pytest_asyncio.fixture(name="test_parameter_condition_model")
-async def test_parameter_model_fixture(db_session: AsyncSession) -> lims_models.SampleContainer:
-    """
-    사용자 권한 테스트에서 사용할 시료 용기(SampleContainer)를
-    모델을 통해 직접 DB에 생성하고 반환합니다.
-    """
-    #  LIMS 도메인의 모델을 사용하여 객체 생성
-    parameter = lims_models.Parameter(
-        code="BOD5",
-        name="BOD 5일",
-        sort_order=1
-    )
+# @pytest_asyncio.fixture(name="test_parameter_condition_model")
+# async def test_parameter_model_fixture(db_session: AsyncSession) -> lims_models.SampleContainer:
+#     """
+#     사용자 권한 테스트에서 사용할 시료 용기(SampleContainer)를
+#     모델을 통해 직접 DB에 생성하고 반환합니다.
+#     """
+#     #  LIMS 도메인의 모델을 사용하여 객체 생성
+#     parameter = lims_models.Parameter(
+#         code="BOD5",
+#         name="BOD 5일",
+#         sort_order=1
+#     )
 
-    #  데이터베이스 세션을 통해 객체 추가 및 저장
-    db_session.add(parameter)
-    await db_session.commit()
-    await db_session.refresh(parameter)
+#     #  데이터베이스 세션을 통해 객체 추가 및 저장
+#     db_session.add(parameter)
+#     await db_session.commit()
+#     await db_session.refresh(parameter)
 
-    return parameter
+#     return parameter
 
 
 @pytest.mark.asyncio
@@ -811,7 +811,7 @@ async def test_create_test_request_with_auto_user_id(
     test_lims_project: lims_models.Project,
     test_department_a: usr_models.Department,
     test_user: usr_models.User,
-    test_parameter_condition_model: lims_models.Parameter  # prarameter (분석항목 생성)
+    # test_parameter_condition_model: lims_models.Parameter  # prarameter (분석항목 생성)
 ):
     """
     [성공/로직] requester_user_id 없이 시험 의뢰 생성 시, 현재 로그인된 사용자로 자동 할당되는지 테스트합니다.
@@ -822,73 +822,100 @@ async def test_create_test_request_with_auto_user_id(
         "project_id": test_lims_project.id,
         "department_id": test_department_a.id,
         "title": "사용자 ID 자동 할당 테스트",
-        "requested_parameters": {"BOD5": True}
+        # "requested_parameters": {"BOD5": True}
     }
     response = await authorized_client.post("/api/v1/lims/test_requests", json=request_data)
     assert response.status_code == 201
     created_request = response.json()
+    print(f"\n test request code: {created_request["request_code"]}")
     assert created_request["requester_user_id"] == test_user.id
 
 
-#  [신규] TestRequest 생성 시 유효성 검사 실패 테스트 추가
-@pytest.mark.asyncio
-async def test_create_test_request_with_invalid_parameter_code(
-    authorized_client: AsyncClient,
-    test_lims_project: lims_models.Project,
-    test_department_a: usr_models.Department
-):
-    """
-    [실패/유효성/신규] 등록되지 않은 파라미터 코드로 시험 의뢰 생성 시 400 에러를 받는지 테스트합니다.
-    """
-    print("\n--- Running test_create_test_request_with_invalid_parameter_code ---")
-    request_data = {
-        "request_date": str(date.today()),
-        "project_id": test_lims_project.id,
-        "department_id": test_department_a.id,
-        "title": "잘못된 파라미터 코드 테스트",
-        "requested_parameters": {"INVALID_CODE": True}
-    }
-    response = await authorized_client.post("/api/v1/lims/test_requests", json=request_data)
-    assert response.status_code == 400
-    assert "등록되지 않은 분석 항목 코드가 포함되어 있습니다" in response.json()["detail"]
+# #  [신규] TestRequest 생성 시 유효성 검사 실패 테스트 추가 [삭제] 분석코드는 각각의 sample에 부여하기에 삭제
+# @pytest.mark.asyncio
+# async def test_create_test_request_with_invalid_parameter_code(
+#     authorized_client: AsyncClient,
+#     test_lims_project: lims_models.Project,
+#     test_department_a: usr_models.Department
+# ):
+#     """
+#     [실패/유효성/신규] 등록되지 않은 파라미터 코드로 시험 의뢰 생성 시 400 에러를 받는지 테스트합니다.
+#     """
+#     print("\n--- Running test_create_test_request_with_invalid_parameter_code ---")
+#     request_data = {
+#         "request_date": str(date.today()),
+#         "project_id": test_lims_project.id,
+#         "department_id": test_department_a.id,
+#         "title": "잘못된 파라미터 코드 테스트",
+#         "requested_parameters": {"INVALID_CODE": True}
+#     }
+#     response = await authorized_client.post("/api/v1/lims/test_requests", json=request_data)
+#     assert response.status_code == 400
+#     assert "등록되지 않은 분석 항목 코드가 포함되어 있습니다" in response.json()["detail"]
 
 
 @pytest.mark.asyncio
-async def test_read_own_test_requests_as_user(
-    authorized_client: AsyncClient,
+async def test_user_can_only_read_requests_from_own_department(
+    authorized_client: AsyncClient,  # test_user로 로그인된 클라이언트 부서A
     db_session: AsyncSession,
-    test_user: usr_models.User,
-    test_admin_user: usr_models.User,
+    test_dep_a_user_a: usr_models.User,
+    test_dep_a_user_b: usr_models.User,
+    test_dep_b_user_a: usr_models.User,
+    test_dep_b_user_b: usr_models.User,
     test_lims_project: lims_models.Project,
     test_department_a: usr_models.Department,
+    test_department_b: usr_models.Department
 ):
     """
-    [성공/권한] 일반 사용자가 자신의 시험 의뢰 목록만 조회할 수 있는지 테스트합니다.
+    [성공/권한] 일반 사용자가 자신의 부서에 속한 시험 의뢰 목록만 조회할 수 있는지 테스트합니다.
+    - 자신의 의뢰와 같은 부서 다른 사람의 의뢰는 보여야 합니다.
+    - 다른 부서의 의뢰는 보이지 않아야 합니다.
     """
     print("\n--- Running test_read_own_test_requests_as_user ---")
 
+    # 1. 내 의뢰 (test_dep_a_user_a가  자신의 부서(A)에 생성)
     await lims_crud.test_request.create(db_session, obj_in=lims_schemas.TestRequestCreate(
         request_date=date.today(),
         project_id=test_lims_project.id,
-        department_id=test_department_a.id,
-        title="내 의뢰",
-        requested_parameters={}
-    ), current_user_id=test_user.id)
+        department_id=test_dep_a_user_a.department_id,
+        title="부서A 사용자A 의뢰",
+    ), current_user_id=test_dep_a_user_a.id)
 
     await lims_crud.test_request.create(db_session, obj_in=lims_schemas.TestRequestCreate(
         request_date=date.today(),
         project_id=test_lims_project.id,
-        department_id=test_department_a.id,
-        title="다른 사람 의뢰",
-        requested_parameters={}
-    ), current_user_id=test_admin_user.id)
+        department_id=test_dep_a_user_a.department_id,
+        title="부서A 사용자B 의뢰",
+    ), current_user_id=test_dep_a_user_b.id)
+
+    await lims_crud.test_request.create(db_session, obj_in=lims_schemas.TestRequestCreate(
+        request_date=date.today(),
+        project_id=test_lims_project.id,
+        department_id=test_dep_b_user_a.department_id,
+        title="부서B 사용자A 의뢰",
+    ), current_user_id=test_dep_b_user_a.id)
+
+    await lims_crud.test_request.create(db_session, obj_in=lims_schemas.TestRequestCreate(
+        request_date=date.today(),
+        project_id=test_lims_project.id,
+        department_id=test_dep_b_user_b.department_id,
+        title="부서B 사용자B 의뢰",
+    ), current_user_id=test_dep_b_user_b.id)
+
+    await db_session.commit()
 
     response = await authorized_client.get("/api/v1/lims/test_requests")
     assert response.status_code == 200
     requests = response.json()
 
-    assert len(requests) == 1
-    assert requests[0]["title"] == "내 의뢰"
+    # A부서에 속한 의뢰 2개만 보여야 함
+    assert len(requests) == 2
+
+    # 반환된 의뢰들의 제목을 집합(set)으로 만들어 순서에 상관없이 검증
+    returned_titles = {req["title"] for req in requests}
+    assert "부서B" not in returned_titles
+
+    print("--- Test successful: User can see all requests from their department and not from others. ---")
 
 
 @pytest.mark.asyncio

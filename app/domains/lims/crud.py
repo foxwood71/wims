@@ -335,21 +335,21 @@ class CRUDTestRequest(CRUDBase[lims_models.TestRequest, lims_schemas.TestRequest
         if obj_in.requester_user_id is None:
             obj_in.requester_user_id = current_user_id
 
-        # 3. 의뢰된 분석 항목 유효성 검사 (사용자 제안)
+        # 3. 의뢰된 분석 항목 유효성 검사 (사용자 제안) [삭제] 각각의 sample에 분석항목을 기록
         #    (주의: requested_parameters의 key가 Parameter의 'code'라고 가정합니다.)
-        if obj_in.requested_parameters:
-            requested_param_codes = list(obj_in.requested_parameters.keys())
-            query = select(lims_models.Parameter.code).where(
-                lims_models.Parameter.code.in_(requested_param_codes)
-            )
-            result = await db.execute(query)
-            valid_param_codes = {code for code, in result.all()}
-            invalid_codes = set(requested_param_codes) - valid_param_codes
-            if invalid_codes:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"등록되지 않은 분석 항목 코드가 포함되어 있습니다: {', '.join(invalid_codes)}"
-                )
+        # if obj_in.requested_parameters:
+        #     requested_param_codes = list(obj_in.requested_parameters.keys())
+        #     query = select(lims_models.Parameter.code).where(
+        #         lims_models.Parameter.code.in_(requested_param_codes)
+        #     )
+        #     result = await db.execute(query)
+        #     valid_param_codes = {code for code, in result.all()}
+        #     invalid_codes = set(requested_param_codes) - valid_param_codes
+        #     if invalid_codes:
+        #         raise HTTPException(
+        #             status_code=status.HTTP_400_BAD_REQUEST,
+        #             detail=f"등록되지 않은 분석 항목 코드가 포함되어 있습니다: {', '.join(invalid_codes)}"
+        #         )
 
         # 4. 필수 및 선택적 FK 존재 여부 확인 (기존 로직)
         #    (순환 참조를 피하기 위해 함수 내에서 임포트)
@@ -399,11 +399,11 @@ class CRUDTestRequest(CRUDBase[lims_models.TestRequest, lims_schemas.TestRequest
             if obj_in.sampling_weather_id is None:
                 db_obj.sampling_weather_id = None
 
-        # request_code는 보통 업데이트하지 않지만, schema에 있다면 처리
-        if obj_in.request_code is not None and obj_in.request_code != db_obj.request_code:
-            existing_by_code = await self.get_by_request_code(db, request_code=obj_in.request_code)
-            if existing_by_code and existing_by_code.id != db_obj.id:
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Test request with this code already exists.")
+        # # request_code는 보통 업데이트하지 않지만, schema에 있다면 처리 [삭제] 각각의 sample에 분석항목을 기록
+        # if obj_in.request_code is not None and obj_in.request_code != db_obj.request_code:
+        #     existing_by_code = await self.get_by_request_code(db, request_code=obj_in.request_code)
+        #     if existing_by_code and existing_by_code.id != db_obj.id:
+        #         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Test request with this code already exists.")
 
         return await super().update(db, db_obj=db_obj, obj_in=obj_in)
 

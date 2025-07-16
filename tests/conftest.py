@@ -88,7 +88,7 @@ async def setup_database():
         print("--- Dropping all tables... ---")
         for schema_name in SCHEMA:
             # 존재하지 않는 스키마를 삭제하려 할 때 오류가 나지 않도록 IF EXISTS 사용
-            await conn.execute(f"DROP SCHEMA IF EXISTS {schema_name} CASCADE")
+            await conn.execute(text(f"DROP SCHEMA IF EXISTS {schema_name} CASCADE"))
 
         # --- 2. 스키마 생성 ---
         print("--- Creating schemas... ---")
@@ -168,7 +168,7 @@ def get_password_hash_fixture():
 @pytest_asyncio.fixture(scope="function")
 async def test_department_a(db_session: AsyncSession) -> usr_models.Department:
     """테스트용 부서A를 데이터베이스에 생성하고 반환합니다."""
-    department = usr_models.Department(code="DEPT", name="테스트 부서A")
+    department = usr_models.Department(code="DEP0", name="테스트 부서A")
     db_session.add(department)
     await db_session.commit()
     await db_session.refresh(department)
@@ -178,7 +178,7 @@ async def test_department_a(db_session: AsyncSession) -> usr_models.Department:
 @pytest_asyncio.fixture(scope="function")
 async def test_department_b(db_session: AsyncSession) -> usr_models.Department:
     """테스트용 부서B를 데이터베이스에 생성하고 반환합니다."""
-    department = usr_models.Department(code="DEPT-OTHER", name="테스트 부서B")
+    department = usr_models.Department(code="DEP1", name="테스트 부서B")
     db_session.add(department)
     await db_session.commit()
     await db_session.refresh(department)
@@ -283,10 +283,43 @@ async def test_user(user_factory: Callable, test_department_a: usr_models.Depart
 
 
 @pytest_asyncio.fixture(scope="function")
-async def test_user_in_other_department(user_factory: Callable, test_department_b: usr_models.Department) -> usr_models.User:
+async def test_dep_a_user_a(user_factory: Callable, test_department_a: usr_models.Department) -> usr_models.User:
     """일반 사용자(GENERAL_USER)를 생성합니다."""
     return await user_factory(
-        "testuser", "testpass123",
+        "testuser_a", "testpass123",
+        role=usr_models.UserRole.GENERAL_USER,
+        department_id=test_department_a.id,
+        notes="General Test User"
+    )
+
+
+@pytest_asyncio.fixture(scope="function")
+async def test_dep_a_user_b(user_factory: Callable, test_department_a: usr_models.Department) -> usr_models.User:
+    """일반 사용자(GENERAL_USER)를 생성합니다."""
+    return await user_factory(
+        "testuser_b", "testpass123",
+        role=usr_models.UserRole.GENERAL_USER,
+        department_id=test_department_a.id,
+        notes="General Test User"
+    )
+
+
+@pytest_asyncio.fixture(scope="function")
+async def test_dep_b_user_a(user_factory: Callable, test_department_b: usr_models.Department) -> usr_models.User:
+    """일반 사용자(GENERAL_USER)를 생성합니다."""
+    return await user_factory(
+        "testuser_a", "testpass123",
+        role=usr_models.UserRole.GENERAL_USER,
+        department_id=test_department_b.id,
+        notes="General Test User"
+    )
+
+
+@pytest_asyncio.fixture(scope="function")
+async def test_dep_b_user_b(user_factory: Callable, test_department_b: usr_models.Department) -> usr_models.User:
+    """일반 사용자(GENERAL_USER)를 생성합니다."""
+    return await user_factory(
+        "testuser_b", "testpass123",
         role=usr_models.UserRole.GENERAL_USER,
         department_id=test_department_b.id,
         notes="General Test User"
