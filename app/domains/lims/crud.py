@@ -334,19 +334,24 @@ class CRUDTestRequest(CRUDBase[lims_models.TestRequest, lims_schemas.TestRequest
         시험 의뢰 다중 조회 (부서 및 의뢰 날짜 검색 기능 포함)
         """
         query = select(self.model)
+        conditions = []
 
         # 1. 부서 ID 필터링
         if department_id is not None:
-            query = query.where(self.model.department_id == department_id)
+            conditions.append(self.model.department_id == department_id)
 
         # 2. 시작일 필터링 (TestRequest 모델의 'request_date' 필드 사용)
         if start_date is not None:
-            query = query.where(self.model.request_date >= start_date)
+            conditions.append(self.model.request_date >= start_date)
 
         # 3. 종료일 필터링 (TestRequest 모델의 'request_date' 필드 사용)
         if end_date is not None:
             # end_date 당일까지 포함하기 위함
-            query = query.where(self.model.request_date < end_date + timedelta(days=1))
+            conditions.append(self.model.request_date < end_date + timedelta(days=1))
+
+        # 모든 조건을 하나의 where 절로 합칩니다.
+        if conditions:  # 조건이 하나라도 존재할 경우에만 where 절을 추가합니다.
+            query = query.where(*conditions)  # *conditions는 리스트의 안의 각 조건 객체들을 AND로 묶어서 하나의 WHERE 절로 변환
 
         # 정렬 및 페이징
         query = query.order_by(self.model.id.desc()).offset(skip).limit(limit)

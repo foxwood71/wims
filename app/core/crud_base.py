@@ -5,7 +5,8 @@
 모든 메서드는 비동기(async) 환경에 맞게 수정되었습니다.
 """
 
-from typing import Generic, List, Optional, Type, TypeVar, Any
+from typing import Generic, List, Optional, Type, TypeVar, Any, Dict
+from datetime import date, timedelta
 
 # [수정] 비동기 세션을 위한 임포트를 명확히 합니다.
 from sqlmodel import SQLModel, select
@@ -54,6 +55,111 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
     ) -> Optional[ModelType]:
         statement = select(self.model).where(getattr(self.model, attribute) == value)
         response = await db.execute(statement)
+        return response.scalar_one_or_none()
+
+    """
+    조건을 만족하는 레코드가 여러개면 offset과 limit를 활용하여 반환하며,
+    조건을 만족하는 레코드가 전혀 없으면 None을 반환
+    """
+    async def get_filtered(
+        self,
+        db: AsyncSession,
+        *,
+        filters: Optional[Dict[str, Any]] = None,  # 다중 속성 필터: {"attribute_name": "value"}
+        date_range_field: Optional[str] = None,    # 기간 검색을 적용할 날짜 필드 이름 (예: "request_date")
+        start_date: Optional[date] = None,         # 기간 검색 시작일
+        end_date: Optional[date] = None,           # 기간 검색 종료일
+        order_by_field: Optional[str] = None,      # 정렬할 필드 (예: "id")
+        order_desc: bool = True,                   # 내림차순 정렬 여부
+        skip: int = 0,
+        limit: int = 100
+    ) -> List[ModelType]:
+        """
+        다중 속성 및 기간 검색 기능을 포함한 다중 조회.
+        """
+        query = select(self.model)
+        conditions = []
+
+        # 1. 다중 속성 필터링
+        if filters:
+            for attribute, value in filters.items():
+                if hasattr(self.model, attribute):
+                    conditions.append(getattr(self.model, attribute) == value)
+                else:
+                    # 유효하지 않은 속성이 전달될 경우 경고 또는 에러 처리
+                    print(f"Warning: Model {self.model.__name__} has no attribute '{attribute}'")
+
+        # 2. 기간 검색 필터링
+        if date_range_field and hasattr(self.model, date_range_field):
+            date_field = getattr(self.model, date_range_field)
+            if start_date is not None:
+                conditions.append(date_field >= start_date)
+            if end_date is not None:
+                # end_date 당일까지 포함하기 위함
+                conditions.append(date_field < end_date + timedelta(days=1))
+        elif date_range_field:
+            print(f"Warning: Model {self.model.__name__} has no attribute '{date_range_field}' for date range filtering.")
+
+        # 모든 조건을 하나의 where 절로 합칩니다.
+        if conditions:
+            query = query.where(*conditions)
+
+        # 3. 정렬 (선택 사항)
+        if order_by_field and hasattr(self.model, order_by_field):
+            if order_desc:
+                query = query.order_by(getattr(self.model, order_by_field).desc())
+            else:
+                query = query.order_by(getattr(self.model, order_by_field))
+        elif order_by_field:
+            print(f"Warning: Model {self.model.__name__} has no attribute '{order_by_field}' for ordering.")
+        else:
+            # 기본 정렬 (예: id 내림차순)
+            if hasattr(self.model, 'id'):
+                query = query.order_by(self.model.id.desc())
+
+        # 4. 페이징
+        query = query.offset(skip).limit(limit)
+
+        result = await db.execute(query)
+        return result.scalars().all()
+
+    """
+    조건을 만족하는 레코드가 여러 개 있더라도, 이 함수는 그 중 첫 번째 것을 반환하며,
+    조건을 만족하는 레코드가 전혀 없으면 None을 반환
+    """
+    async def get_one_filtered(
+        self,
+        db: AsyncSession,
+        *,
+        filters: Optional[Dict[str, Any]] = None,
+        date_range_field: Optional[str] = None,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+    ) -> Optional[ModelType]:
+        """
+        다중 속성 및 기간 검색 기능을 포함하여 단일 항목 조회.
+        """
+        query = select(self.model)
+        conditions = []
+
+        # 다중 속성 필터링
+        if filters:
+            for attribute, value in filters.items():
+                if hasattr(self.model, attribute):
+                    conditions.append(getattr(self.model, attribute) == value)
+
+        # 기간 검색 필터링
+        if date_range_field and hasattr(self.model, date_range_field):
+            date_field = getattr(self.model, date_range_field)
+            if start_date is not None:
+                conditions.append(date_field >= start_date)
+            if end_date is not None:
+                conditions.append(date_field < end_date + timedelta(days=1))
+
+        if conditions:
+            query = query.where(*conditions)
+
+        response = await db.execute(query)
         return response.scalar_one_or_none()
 
     async def create(self, db: AsyncSession, *, obj_in: CreateSchemaType) -> ModelType:
