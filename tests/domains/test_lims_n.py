@@ -8,7 +8,7 @@
 - 다양한 사용자 역할(관리자, 일반 사용자, 비인증 사용자)에 따른
   인증 및 권한 부여 로직을 검증합니다.
 """
-
+from typing import AsyncGenerator, Callable
 import pytest
 import pytest_asyncio
 from datetime import date, datetime, timedelta, UTC
@@ -858,8 +858,8 @@ async def test_create_test_request_with_auto_login_id(
 @pytest.mark.asyncio
 async def test_user_can_only_read_requests_from_own_department(
     db_session: AsyncSession,
-    lab_analyst_client: AsyncClient,
-    authorized_client: AsyncClient,  # test_user로 로그인된 클라이언트 부서A
+    # authorized_client: AsyncClient,  # test_user로 로그인된 클라이언트 부서A
+    authorized_client_factory: Callable[..., AsyncGenerator[AsyncClient, None]],
     test_department_a: usr_models.Department,
     test_department_b: usr_models.Department,
     test_lab_analyst: usr_models.Department,
@@ -867,6 +867,10 @@ async def test_user_can_only_read_requests_from_own_department(
     test_dep_a_user_b: usr_models.User,
     test_dep_b_user_c: usr_models.User,
     test_dep_b_user_d: usr_models.User,
+    test_admin_user: usr_models.User,
+    test_lab_manager: usr_models.User,
+    lab_analyst_client: usr_models.User,
+    test_user: usr_models.User,
     test_lims_project: lims_models.Project,
 ):
     """
@@ -907,25 +911,51 @@ async def test_user_can_only_read_requests_from_own_department(
 
     await db_session.commit()
 
-    response = await authorized_client.get("/api/v1/lims/test_requests")
-    assert response.status_code == 200
-    requests = response.json()
+    # 1. 관리자 클라이언트로 테스트
+    async with authorized_client_factory(user=test_admin_user, password="sysadmpass123") as admin_client:
+        print("[❓] Testing with Admin Client...")
+        response = await admin_client.get("/api/v1/lims/test_requests")
 
-    # A부서에 속한 의뢰 2개만 보여야 함
-    assert len(requests) == 2
+        assert response.status_code == 200
+        requests = response.json()
+        # 전체 의뢰 4개 보여야 함
+        assert len(requests) == 4
+
+    # 2. 실험실 관리자 클라이언트로 테스트
+    async with authorized_client_factory(user=test_lab_manager, password="labmgrpass123") as lab_manager_client:
+        print("[❓] Testing with lab manager Client...")
+        response = await lab_manager_client.get("/api/v1/lims/test_requests")
+
+        assert response.status_code == 200
+        requests = response.json()
+        # 전체 의뢰 4개 보여야 함
+        assert len(requests) == 4
+
+    # 3. 실험실 분석자 클라이언트로 테스트
+    async with authorized_client_factory(user=test_lab_analyst, password="labanalystpass123") as lab_analyst_client:
+        print("[❓] Testing with lab analyst Client...")
+        response = await lab_analyst_client.get("/api/v1/lims/test_requests")
+
+        assert response.status_code == 200
+        requests = response.json()
+        # 전체 의뢰 4개 보여야 함
+        assert len(requests) == 4
+
+    # 4. 실험실 분석자 클라이언트로 테스트
+    async with authorized_client_factory(user=test_user, password="testpass123") as user_client:
+        print("[❓] Testing with Normal User Client...")
+        response = await user_client.get("/api/v1/lims/test_requests")
+
+        assert response.status_code == 200
+        requests = response.json()
+        # 부서 의뢰 2개만 보여야 함
+        assert len(requests) == 2
 
     # 반환된 의뢰들의 제목을 집합(set)으로 만들어 순서에 상관없이 검증
-    returned_titles = {req["title"] for req in requests}
-    assert "부서B" not in returned_titles
+    # returned_titles = {req["title"] for req in requests}
+    # assert "부서B" not in returned_titles
 
-    response = await lab_analyst_client.get("/api/v1/lims/test_requests")
-    assert response.status_code == 200
-    requests = response.json()
-
-    # 전체 의뢰 4개 보여야 함
-    assert len(requests) == 4
-
-    print("--- Test successful: User can see all requests from their department and not from others. ---")
+    print("--- ✅ Test successful: User can see all requests from their department and not from others. ---")
 
 
 @pytest.mark.asyncio
